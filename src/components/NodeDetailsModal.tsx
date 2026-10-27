@@ -78,7 +78,7 @@ export const NodeDetailsModal: React.FC<NodeDetailsModalProps> = ({
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                       <Flame className="w-4 h-4 text-orange-500" />
-                      核心温度分布 ({thermal.source === 'ssh' ? 'SSH 传感器探针' : 'PVE API'})
+                      核心温度分布 (PVE REST API)
                     </span>
                     <span className="font-mono font-bold text-orange-600 dark:text-orange-400 text-sm">
                       Package: {thermal.main}°C

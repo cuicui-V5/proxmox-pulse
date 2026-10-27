@@ -65,10 +65,6 @@
    PVE_TOKEN_ID=root@pam!dashboard
    PVE_TOKEN_SECRET=你的-token-secret-uuid
    PVE_VERIFY_SSL=false
-
-   # 可选：配置 SSH 凭据以开启 CPU 温度与核心传感器监控
-   PVE_SSH_USER=root
-   PVE_SSH_PASSWORD=你的PVE密码
    ```
 
 3. **启动容器**：
@@ -112,24 +108,25 @@ docker run -d --name proxmox-pulse --restart unless-stopped -p 3333:3333 pve-pul
 
 ---
 
-## 🌡️ 关于 CPU 温度监控的说明（两种方案）
+## 🌡️ 关于 CPU 温度监控的说明（PVE 原生 REST API 免密直连）
 
-Proxmox VE 官方 API 默认未返回硬件温度。Proxmox Pulse 提供了业界最优雅的免密直连方案与备用通道：
+Proxmox VE 官方 API 默认未返回硬件温度，常规做法通常需要开放 SSH 端口并传递主机 root 密码，既不安全也破坏了 API Token 的纯净架构。
 
-### ✨ 方案一：PVE 原生 API 扩展（强烈推荐 • 最优雅）
-在 PVE 网页 Shell 或 SSH 终端中粘贴执行：
+Proxmox Pulse 采用 **100% 纯 API Token 直连方案**，面板完全不需要任何 SSH 密码或开放 22 端口！
+
+### 🚀 一键开启温度接口（3 秒完成）
+在 PVE 宿主机网页端的 `Shell` 中粘贴并执行以下单行命令：
 ```bash
 curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve-thermal.sh | bash
 ```
-- **工作原理**：向 PVE 官方节点接口注入安全只读读取逻辑，使官方 `/api2/json/nodes/{node}/status` 自动包含温度数据。
-- **极致优雅**：
-  - 🔒 **纯 API Token 通信**：面板**完全不需要**任何 SSH 账号密码！
-  - 🌐 **无需开放 22 端口**：仅复用现有 8006 端口即可完成所有监控。
-  - ⚡ **零额外网络延迟**：温度数据伴随每次节点常规状态查询一次性返回。
-  - 🔄 **支持随时一键完全还原**：执行 `bash setup-pve-thermal.sh uninstall` 即可恢复官方原版文件。
 
-### 方案二：SSH 探针（免改动 PVE 备用方案）
-如果无法或不希望在 PVE 上执行扩展脚本，可在面板「设置」或 `.env` 中提供 PVE 的 SSH 密码/私钥，面板将通过后台探针轻量采样。
+### 💡 技术原理与安全性说明
+- **工作原理**：向 PVE 官方节点状态接口 (`/usr/share/perl5/PVE/API2/Nodes.pm`) 追加轻量只读读取逻辑 (`sensors -j`)，使 PVE 官方 REST API (`GET /api2/json/nodes/{node}/status`) 直接返回 `thermalstate` 结构化 JSON。
+- **纯净安全**：
+  - 🔒 **零 SSH 依赖**：面板与 PVE 的所有通信（状态、指标、电源、温度）100% 运行在官方 HTTPS 8006 端口上，仅使用受限 API Token。
+  - ⚡ **零额外网络延迟**：温度随节点常规状态一并返回，无需反复建立 SSH 握手连接。
+  - 🛡️ **不影响系统更新**：脚本在注入前会自动备份原文件；Debian/PVE 后续系统升级 (`apt update && apt dist-upgrade`) 会直接平滑覆盖该非配置模板文件，绝不报错或中断软件包升级。
+  - 🔄 **随时一键无痕还原**：如需恢复 PVE 初始状态，随时执行 `curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve-thermal.sh | bash -s -- uninstall` 即可秒级还原官方出厂文件。
 
 ---
 

@@ -88,7 +88,7 @@ export const OverviewCards: React.FC<OverviewCardsProps> = ({
                 e.stopPropagation();
                 onOpenSettings();
               }}
-              title="未开启温度监控，点击配置 PVE SSH 凭据以启用传感器"
+              title="未检测到温度数据，点击查看开启指引"
               className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 border border-slate-200 dark:border-slate-700"
             >
               <Thermometer className="w-3 h-3" />

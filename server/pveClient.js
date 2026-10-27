@@ -16,13 +16,6 @@ class PveClient {
     this.tokenSecret = config.tokenSecret || process.env.PVE_TOKEN_SECRET || '';
     this.verifySsl = config.verifySsl ?? (process.env.PVE_VERIFY_SSL === 'true');
 
-    // SSH thermal sensor config
-    this.sshHost = config.sshHost || process.env.PVE_SSH_HOST || this.host;
-    this.sshPort = config.sshPort || process.env.PVE_SSH_PORT || 22;
-    this.sshUser = config.sshUser || process.env.PVE_SSH_USER || 'root';
-    this.sshPassword = config.sshPassword || process.env.PVE_SSH_PASSWORD || '';
-    this.sshKey = config.sshKey || process.env.PVE_SSH_KEY || '';
-
     this.initAxios();
   }
 
@@ -48,23 +41,7 @@ class PveClient {
     if (newConfig.tokenSecret) this.tokenSecret = newConfig.tokenSecret;
     if (newConfig.verifySsl !== undefined) this.verifySsl = newConfig.verifySsl;
 
-    if (newConfig.sshHost) this.sshHost = newConfig.sshHost;
-    if (newConfig.sshPort) this.sshPort = newConfig.sshPort;
-    if (newConfig.sshUser) this.sshUser = newConfig.sshUser;
-    if (newConfig.sshPassword) this.sshPassword = newConfig.sshPassword;
-    if (newConfig.sshKey) this.sshKey = newConfig.sshKey;
-
     this.initAxios();
-  }
-
-  getSshConfig() {
-    return {
-      host: this.sshHost || this.host,
-      port: this.sshPort || 22,
-      username: this.sshUser || 'root',
-      password: this.sshPassword,
-      privateKey: this.sshKey
-    };
   }
 
   getConfig() {
@@ -73,12 +50,7 @@ class PveClient {
       port: this.port,
       tokenId: this.tokenId,
       hasSecret: !!this.tokenSecret,
-      verifySsl: this.verifySsl,
-      sshHost: this.sshHost,
-      sshPort: this.sshPort,
-      sshUser: this.sshUser,
-      hasSshPassword: !!this.sshPassword,
-      hasSshKey: !!this.sshKey
+      verifySsl: this.verifySsl
     };
   }
 

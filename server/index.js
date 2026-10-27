@@ -51,7 +51,7 @@ app.get('/api/overview', async (req, res) => {
       pveClient.getStorage(primaryNodeName).catch(() => [])
     ]);
 
-    const thermal = await thermalService.getTemperature(nodeStatus, pveClient.getSshConfig()).catch(() => ({ available: false }));
+    const thermal = await thermalService.getTemperature(nodeStatus).catch(() => ({ available: false }));
 
     // Breakdown resources
     const guests = resources.filter(r => r.type === 'qemu' || r.type === 'lxc');
@@ -96,7 +96,7 @@ app.get('/api/nodes/:node/status', async (req, res) => {
 app.get('/api/nodes/:node/thermal', async (req, res) => {
   try {
     const nodeStatus = await pveClient.getNodeStatus(req.params.node).catch(() => null);
-    const thermal = await thermalService.getTemperature(nodeStatus, pveClient.getSshConfig());
+    const thermal = await thermalService.getTemperature(nodeStatus);
     res.json({ ok: true, thermal });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
