@@ -193,10 +193,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <span>✨ 优雅免密架构：复用官方 API 端口 (8006)</span>
                 </div>
                 <p className="text-[11px] text-slate-600 dark:text-emerald-200/80 mb-2 leading-relaxed">
-                  面板通过 PVE 官方 API Token 直连获取宿主机 CPU 与核心温度，<strong>零 SSH 依赖、无需开放额外端口、零密码风险</strong>。若新节点尚未开启温度接口，在 PVE 网页 Shell 中粘贴执行以下单行命令即可：
+                  面板通过 PVE 官方 API Token 直连获取宿主机 CPU 与核心温度，<strong>零 SSH 依赖、无需开放额外端口、零密码风险</strong>。若新节点尚未开启温度接口，在 PVE 网页 Shell 中粘贴执行下方全能初始化脚本即可一键配置：
                 </p>
                 <code className="block bg-white dark:bg-slate-950 px-2 py-1.5 rounded border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] select-all break-all">
-                  curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve-thermal.sh | bash
+                  curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve.sh | bash
                 </code>
               </div>
             </div>
