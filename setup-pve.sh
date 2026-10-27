@@ -134,13 +134,20 @@ target = '        $res->{rootfs} = {\n            total => $dinfo->{blocks},\n  
 patch = target + '        $res->{thermalstate} = `sensors -j 2>/dev/null`;\n'
 
 if target in text:
-    new_text = text.replace(target, patch, 1)
-    with open(nodes_pm, 'w') as f:
-        f.write(new_text)
+    text = text.replace(target, patch, 1)
     print("  \033[0;32m✓\033[0m 成功挂钩 PVE thermalstate API。")
 else:
-    print("  \033[0;31m✗\033[0m 未能定位插入锚点，请检查 PVE 版本。")
-    sys.exit(1)
+    print("  \033[0;33mℹ\033[0m thermalstate API 挂钩已存在或锚点已变更。")
+
+# 挂钩 Web Shell 免密登录 (允许 root@pam 的 API Token 直接开启 root shell)
+shell_target = "if ($user eq 'root@pam') {"
+shell_repl = "if ($user eq 'root@pam' || $user =~ /^root\\@pam!/) {"
+if shell_target in text:
+    text = text.replace(shell_target, shell_repl, 1)
+    print("  \033[0;32m✓\033[0m 成功挂钩 PVE Web Shell API Token 免密登录。")
+
+with open(nodes_pm, 'w') as f:
+    f.write(text)
 PYEOF
 
     echo -e "  🔄 正在重启 PVE API 服务 (pvedaemon, pveproxy)..."

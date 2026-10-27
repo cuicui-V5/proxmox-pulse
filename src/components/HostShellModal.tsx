@@ -135,12 +135,22 @@ export const HostShellModal: React.FC<HostShellModalProps> = ({
           // Connected to proxy
         };
 
-        ws.onmessage = (event) => {
-          const str = typeof event.data === 'string' ? event.data : '';
-          if (!authDone && str.startsWith('OK')) {
+        ws.onmessage = async (event) => {
+          let text = '';
+          if (typeof event.data === 'string') {
+            text = event.data;
+          } else if (event.data instanceof Blob) {
+            text = await event.data.text();
+          } else if (event.data instanceof ArrayBuffer) {
+            text = new TextDecoder().decode(event.data);
+          }
+
+          if (text === '{"type":"ready"}') {
             authDone = true;
             if (!isCancelled) {
               setStatus('connected');
+              try { fitAddon.fit(); } catch {}
+              term.focus();
               // Notify PVE termproxy of terminal dimensions: 1:cols:rows:
               ws.send(`1:${term.cols}:${term.rows}:`);
               // Send ping every 30s to keep alive
@@ -150,26 +160,56 @@ export const HostShellModal: React.FC<HostShellModalProps> = ({
                 }
               }, 30000);
             }
-            if (str.length > 2) {
-              term.write(str.substring(2));
+            return;
+          }
+
+          if (!authDone && text.startsWith('OK')) {
+            authDone = true;
+            if (!isCancelled) {
+              setStatus('connected');
+              try { fitAddon.fit(); } catch {}
+              term.focus();
+              // Notify PVE termproxy of terminal dimensions: 1:cols:rows:
+              ws.send(`1:${term.cols}:${term.rows}:`);
+              // Send ping every 30s to keep alive
+              pingInterval = setInterval(() => {
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send('2');
+                }
+              }, 30000);
+            }
+            const rest = text.replace(/^OK\r?\n?/, '');
+            if (rest.length > 0) {
+              term.write(rest);
             }
             return;
           }
 
-          if (authDone) {
-            term.write(event.data);
+          if (!authDone && !isCancelled) {
+            authDone = true;
+            setStatus('connected');
+            try { fitAddon.fit(); } catch {}
+            term.focus();
+            ws.send(`1:${term.cols}:${term.rows}:`);
+            pingInterval = setInterval(() => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send('2');
+              }
+            }, 30000);
           }
+
+          term.write(text);
         };
 
         term.onData((data) => {
-          if (ws.readyState === WebSocket.OPEN && authDone) {
+          if (ws.readyState === WebSocket.OPEN) {
             const bytes = new TextEncoder().encode(data);
             ws.send(`0:${bytes.length}:${data}`);
           }
         });
 
         term.onResize((size) => {
-          if (ws.readyState === WebSocket.OPEN && authDone) {
+          if (ws.readyState === WebSocket.OPEN) {
             ws.send(`1:${size.cols}:${size.rows}:`);
           }
         });

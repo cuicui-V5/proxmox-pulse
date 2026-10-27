@@ -472,20 +472,37 @@ server.on('upgrade', (req, socket, head) => {
           }
         });
 
+        let authenticated = false;
+
         pveWs.on('open', () => {
           // Send PVE termproxy initial authentication handshake
           pveWs.send(`${user}:${ticket}\n`);
         });
 
-        clientWs.on('message', (msg, isBinary) => {
+        clientWs.on('message', (msg) => {
           if (pveWs.readyState === WebSocket.OPEN) {
-            pveWs.send(msg, { binary: isBinary });
+            pveWs.send(msg);
           }
         });
 
-        pveWs.on('message', (msg, isBinary) => {
+        pveWs.on('message', (data) => {
+          const str = data.toString('utf8');
+          if (!authenticated) {
+            if (str.startsWith('OK')) {
+              authenticated = true;
+              if (clientWs.readyState === WebSocket.OPEN) {
+                // Send ready signal to notify frontend immediately
+                clientWs.send(JSON.stringify({ type: 'ready' }));
+              }
+              const rest = str.replace(/^OK\r?\n?/, '');
+              if (rest.length > 0 && clientWs.readyState === WebSocket.OPEN) {
+                clientWs.send(rest);
+              }
+              return;
+            }
+          }
           if (clientWs.readyState === WebSocket.OPEN) {
-            clientWs.send(msg, { binary: isBinary });
+            clientWs.send(str);
           }
         });
 
