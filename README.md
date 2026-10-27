@@ -87,7 +87,7 @@ curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-p
 
 > **该全能脚本将全自动为您完成：**
 > 1. 安装 `lm-sensors` 硬件探测包；
-> 2. 向 PVE 原生 API 注入只读 CPU 温度读取挂钩（自动备份原文件，重启 API 立即生效）；
+> 2. 向 PVE 原生 API 注入只读 CPU 温度读取挂钩与宿主机 Web Shell 免密登录支持（具备编译期语法校验与自动备份保护机制）；
 > 3. 校验并确认 VNC 远程控制台原生就绪；
 > 4. 自动生成专属受限 API Token（`root@pam!dashboard`）；
 > 5. 终端直接打印出**属于您这台 PVE 机器的现成 Docker 启动命令与 Token 密钥**！
@@ -235,7 +235,7 @@ curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/uninsta
 ```
 
 > **该卸载脚本将为您：**
-> 1. 恢复 PVE 官方出厂原始 `Nodes.pm` 文件，彻底移除 CPU 温度挂钩；
+> 1. 恢复 PVE 官方出厂原始 `Nodes.pm` 文件，彻底移除 CPU 温度挂钩与 Web Shell 扩展；
 > 2. 清理 `Nodes.pm.bak` 备份文件，重启 `pvedaemon` 与 `pveproxy`；
 > 3. 询问或可选清理 API Token（`root@pam!dashboard`）；
 > 4. 秒级实现 **100% 官方原始出厂状态**，零残留文件、零副作用。

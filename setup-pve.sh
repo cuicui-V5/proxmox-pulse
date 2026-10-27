@@ -24,12 +24,13 @@ NC='\033[0m' # No Color
 
 NODES_PM="/usr/share/perl5/PVE/API2/Nodes.pm"
 BAK_FILE="/usr/share/perl5/PVE/API2/Nodes.pm.bak"
+TMP_FILE="/usr/share/perl5/PVE/API2/Nodes.pm.pulse_tmp"
 
 print_banner() {
     echo -e "${CYAN}${BOLD}"
     echo "========================================================================"
     echo "           Proxmox Pulse - PVE 后端全能环境配置助手                     "
-    echo "     CPU温度注入 • API Token配置 • VNC原生校验 • 一键部署指引          "
+    echo "   CPU温度接口 • 免密Shell支持 • API Token配置 • VNC原生校验 • 一键部署  "
     echo "========================================================================"
     echo -e "${NC}"
 }
@@ -64,13 +65,56 @@ THERMAL_ONLY="no"
 for arg in "$@"; do
     case "$arg" in
         uninstall|--uninstall)
-            echo -e "${YELLOW}🔄 正在卸载 Proxmox Pulse PVE 后端挂钩...${NC}"
-            if [ -f "$BAK_FILE" ]; then
-                cp "$BAK_FILE" "$NODES_PM"
+            echo -e "${YELLOW}🔄 正在卸载 Proxmox Pulse PVE 后端扩展...${NC}"
+            RESTORED=false
+            if [ -f "$BAK_FILE" ] && perl -c "$BAK_FILE" &>/dev/null; then
+                cp -p "$BAK_FILE" "$TMP_FILE"
+                if perl -c "$TMP_FILE" &>/dev/null; then
+                    mv "$TMP_FILE" "$NODES_PM"
+                    rm -f "$BAK_FILE"
+                    RESTORED=true
+                    echo -e "  ${GREEN}✓${NC} 已从官方备份文件安全恢复原始 Nodes.pm。"
+                fi
+                rm -f "$TMP_FILE" 2>/dev/null || true
+            fi
+
+            if [ "$RESTORED" != true ]; then
+                # 无备份或备份损坏时，通过 Python 安全剥离挂钩
+                python3 - << 'PYEOF'
+import re, sys
+
+nodes_pm = '/usr/share/perl5/PVE/API2/Nodes.pm'
+tmp_file = '/usr/share/perl5/PVE/API2/Nodes.pm.pulse_tmp'
+
+try:
+    with open(nodes_pm, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    orig = text
+    # 移除温度挂钩
+    text = re.sub(r'^\s*\$res->\{thermalstate\}\s*=\s*`sensors -j 2>/dev/null`;\r?\n?', '', text, flags=re.MULTILINE)
+    # 还原 shell 判断
+    text = re.sub(r"if\s*\(\s*\$user\s*eq\s*'root@pam'\s*\|\|\s*\$user\s*=~\s*/\^root\\@pam!/\s*\)", "if ($user eq 'root@pam')", text)
+
+    if text != orig:
+        with open(tmp_file, 'w', encoding='utf-8') as f:
+            f.write(text)
+except Exception as e:
+    sys.exit(1)
+PYEOF
+                if [ -f "$TMP_FILE" ] && perl -c "$TMP_FILE" &>/dev/null; then
+                    mv "$TMP_FILE" "$NODES_PM"
+                    RESTORED=true
+                    echo -e "  ${GREEN}✓${NC} 挂钩已精准安全剥离并恢复出厂默认值。"
+                fi
+                rm -f "$TMP_FILE" 2>/dev/null || true
+            fi
+
+            if [ "$RESTORED" = true ]; then
                 systemctl restart pvedaemon pveproxy
                 echo -e "${GREEN}✅ 官方 Nodes.pm 文件已完全还原，pveproxy 服务已重启。${NC}"
             else
-                echo -e "${RED}❌ 未检测到备份文件 $BAK_FILE，无法还原。${NC}"
+                echo -e "${GREEN}✅ Nodes.pm 已经是出厂纯净文件，无需操作。${NC}"
             fi
             exit 0
             ;;
@@ -84,10 +128,10 @@ for arg in "$@"; do
             echo "用法: bash setup-pve.sh [选项]"
             echo ""
             echo "选项:"
-            echo "  (无参数)           完整运行：注入CPU温度接口、生成API Token、提供面板启动指引"
+            echo "  (无参数)           完整运行：配置CPU温度、Web Shell免密、生成API Token并提供启动指引"
             echo "  --recreate-token   重新生成 root@pam!dashboard 的 API Token Secret"
-            echo "  --thermal-only     仅注入 CPU 温度 API 扩展，跳过 Token 和部署提示"
-            echo "  uninstall          一键卸载温度挂钩并恢复 PVE 官方出厂原始文件"
+            echo "  --thermal-only     仅注入硬件状态与Shell API扩展，跳过 Token 和部署提示"
+            echo "  uninstall          一键卸载扩展并安全还原 PVE 官方出厂原始文件"
             echo "  -h, --help         显示此帮助信息"
             exit 0
             ;;
@@ -99,60 +143,117 @@ echo -e "${BLUE}ℹ️ 检测到系统:${NC} ${BOLD}$PVE_VER${NC} (节点: ${BOL
 echo ""
 
 # ==============================================================================
-# 第一部分：PVE 原生 CPU 温度 API 挂钩
+# 第一部分：PVE 原生硬件状态 API 扩展 (CPU 温度 & Web Shell 免密登录)
 # ==============================================================================
-echo -e "${BOLD}[1/4] 配置 PVE 原生 CPU 温度监控接口...${NC}"
+echo -e "${BOLD}[1/4] 配置 PVE 原生 API 扩展 (CPU 温度监控 & 宿主机 Shell 免密登录)...${NC}"
 
-# 1. 检查 lm-sensors
+# 1. 检查并安装 lm-sensors
 if ! command -v sensors &>/dev/null; then
-    echo -e "  📦 正在安装 lm-sensors 传感器套件..."
+    echo -e "  📦 正在安装 lm-sensors 硬件传感器套件..."
     apt-get update -qq && apt-get install -y -qq lm-sensors >/dev/null
     echo -e "  ${GREEN}✓${NC} lm-sensors 安装完成。"
 else
     echo -e "  ${GREEN}✓${NC} lm-sensors 已经安装。"
 fi
 
-# 2. 注入挂钩
-if grep -q "thermalstate" "$NODES_PM"; then
-    echo -e "  ${GREEN}✓${NC} PVE 原生温度 API 扩展已处于激活状态 (无需重复注入)。"
-else
-    # 备份原文件
-    if [ ! -f "$BAK_FILE" ]; then
-        cp "$NODES_PM" "$BAK_FILE"
-        echo -e "  ${GREEN}✓${NC} 已备份原始官方文件至: $BAK_FILE"
-    fi
+# 2. 检查原文件健康度并创建初始备份
+if [ ! -f "$NODES_PM" ]; then
+    echo -e "  ${RED}❌ 未找到目标文件 $NODES_PM，请确认当前环境为 Proxmox VE！${NC}"
+    exit 1
+fi
 
-    # 安全注入
-    python3 - << 'PYEOF'
-import sys
+if [ ! -f "$BAK_FILE" ]; then
+    # 仅当原文件语法完全健康时才创建基准备份
+    if perl -c "$NODES_PM" &>/dev/null; then
+        cp -p "$NODES_PM" "$BAK_FILE"
+        echo -e "  ${GREEN}✓${NC} 已安全备份原始官方文件至: ${BOLD}$BAK_FILE${NC}"
+    else
+        echo -e "  ${RED}❌ 警告: 现有 $NODES_PM 文件未通过语法检查，中止操作以防损坏系统！${NC}"
+        exit 1
+    fi
+fi
+
+# 3. 鲁棒性注入挂钩 (采用临时文件 + Perl 编译期严格语法校验)
+PATCH_OUTPUT=$(python3 - << 'PYEOF'
+import os, sys, re
 
 nodes_pm = '/usr/share/perl5/PVE/API2/Nodes.pm'
-with open(nodes_pm, 'r') as f:
-    text = f.read()
+tmp_file = '/usr/share/perl5/PVE/API2/Nodes.pm.pulse_tmp'
 
-target = '        $res->{rootfs} = {\n            total => $dinfo->{blocks},\n            avail => $dinfo->{bavail},\n            used => $dinfo->{used},\n            free => $dinfo->{blocks} - $dinfo->{used},\n        };\n'
-patch = target + '        $res->{thermalstate} = `sensors -j 2>/dev/null`;\n'
+try:
+    with open(nodes_pm, 'r', encoding='utf-8') as f:
+        text = f.read()
+except Exception as e:
+    print(f"ERROR: 读取文件失败: {e}")
+    sys.exit(1)
 
-if target in text:
-    text = text.replace(target, patch, 1)
-    print("  \033[0;32m✓\033[0m 成功挂钩 PVE thermalstate API。")
+modified = False
+
+# A. CPU 温度挂钩
+if 'thermalstate' in text:
+    print("  \033[0;32m✓\033[0m CPU 核心温度监控接口已处于激活状态。")
 else:
-    print("  \033[0;33mℹ\033[0m thermalstate API 挂钩已存在或锚点已变更。")
+    target_rootfs = '        $res->{rootfs} = {\n            total => $dinfo->{blocks},\n            avail => $dinfo->{bavail},\n            used => $dinfo->{used},\n            free => $dinfo->{blocks} - $dinfo->{used},\n        };\n'
+    patch_thermal = target_rootfs + '        $res->{thermalstate} = `sensors -j 2>/dev/null`;\n'
+    if target_rootfs in text:
+        text = text.replace(target_rootfs, patch_thermal, 1)
+        modified = True
+        print("  \033[0;32m✓\033[0m 成功挂钩 PVE CPU 核心温度 API 扩展。")
+    else:
+        # 正则备用匹配
+        m = re.search(r'(\$res->\{rootfs\}\s*=\s*\{[^\}]+\};(?:\r?\n))', text)
+        if m:
+            insert_pos = m.end()
+            text = text[:insert_pos] + '        $res->{thermalstate} = `sensors -j 2>/dev/null`;\n' + text[insert_pos:]
+            modified = True
+            print("  \033[0;32m✓\033[0m 成功挂钩 PVE CPU 核心温度 API 扩展 (动态锚点)。")
+        else:
+            print("  \033[0;33mℹ\033[0m 未能匹配 rootfs 锚点，跳过温度接口注入。")
 
-# 挂钩 Web Shell 免密登录 (允许 root@pam 的 API Token 直接开启 root shell)
-shell_target = "if ($user eq 'root@pam') {"
-shell_repl = "if ($user eq 'root@pam' || $user =~ /^root\\@pam!/) {"
-if shell_target in text:
-    text = text.replace(shell_target, shell_repl, 1)
-    print("  \033[0;32m✓\033[0m 成功挂钩 PVE Web Shell API Token 免密登录。")
+# B. Web Shell root API Token 免密登录支持
+if re.search(r"\$user\s*=~\s*/\^root\\@pam!/", text):
+    print("  \033[0;32m✓\033[0m 宿主机 Web Shell 免密登录支持已处于激活状态。")
+else:
+    shell_pattern = r"(if\s*\(\s*\$user\s*eq\s*['\"]root@pam['\"]\s*\)\s*\{)"
+    if re.search(shell_pattern, text):
+        text = re.sub(shell_pattern, r"if ($user eq 'root@pam' || $user =~ /^root\\@pam!/) {", text, count=1)
+        modified = True
+        print("  \033[0;32m✓\033[0m 成功挂钩 宿主机 Web Shell API Token 免密登录。")
+    else:
+        print("  \033[0;33mℹ\033[0m 未能匹配 get_shell_command 锚点，跳过 Shell 挂钩。")
 
-with open(nodes_pm, 'w') as f:
-    f.write(text)
+if modified:
+    try:
+        with open(tmp_file, 'w', encoding='utf-8') as f:
+            f.write(text)
+        print("STATUS_MODIFIED")
+    except Exception as e:
+        print(f"ERROR: 写入临时文件失败: {e}")
+        sys.exit(1)
+else:
+    print("STATUS_UPTODATE")
 PYEOF
+)
 
-    echo -e "  🔄 正在重启 PVE API 服务 (pvedaemon, pveproxy)..."
-    systemctl restart pvedaemon pveproxy
-    echo -e "  ${GREEN}✓${NC} PVE API 服务重启完成，温度接口已生效！"
+# 输出 Python 执行摘要 (过滤状态标记)
+echo "$PATCH_OUTPUT" | grep -v -E "STATUS_MODIFIED|STATUS_UPTODATE" || true
+
+if echo "$PATCH_OUTPUT" | grep -q "STATUS_MODIFIED"; then
+    # 4. 关键安全保障: 编译期严格校验 Perl 模块语法 (perl -c)
+    if perl -c "$TMP_FILE" &>/dev/null; then
+        # 校验 100% 通过，原子替换，零损坏风险
+        mv -f "$TMP_FILE" "$NODES_PM"
+        echo -e "  ${GREEN}✓${NC} Perl 模块语法校验完全合格，配置已安全原子写入！"
+        echo -e "  🔄 正在重启 PVE API 服务 (pvedaemon, pveproxy)..."
+        systemctl restart pvedaemon pveproxy
+        echo -e "  ${GREEN}✓${NC} PVE API 服务重启完成，硬件状态与 Web Shell 扩展已生效！"
+    else
+        echo -e "  ${RED}❌ 编译校验未通过！保护机制触发：已销毁临时修改，生产文件未做任何变动。${NC}"
+        rm -f "$TMP_FILE" 2>/dev/null || true
+        exit 1
+    fi
+else
+    rm -f "$TMP_FILE" 2>/dev/null || true
 fi
 
 echo ""

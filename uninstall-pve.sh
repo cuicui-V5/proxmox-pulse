@@ -21,6 +21,7 @@ NC='\033[0m'
 
 NODES_PM="/usr/share/perl5/PVE/API2/Nodes.pm"
 BAK_FILE="/usr/share/perl5/PVE/API2/Nodes.pm.bak"
+TMP_FILE="/usr/share/perl5/PVE/API2/Nodes.pm.pulse_tmp"
 
 echo -e "${CYAN}${BOLD}"
 echo "========================================================================"
@@ -62,39 +63,72 @@ for arg in "$@"; do
     esac
 done
 
-echo -e "${BOLD}[1/2] 还原 PVE 原生 API 文件并移除温度挂钩...${NC}"
+echo -e "${BOLD}[1/2] 还原 PVE 原生 API 文件并移除所有扩展挂钩...${NC}"
 
 RESTORED=false
 
-# 检查备份文件
+# 1. 优先使用官方出厂原始备份文件恢复
 if [ -f "$BAK_FILE" ]; then
-    cp "$BAK_FILE" "$NODES_PM"
-    rm -f "$BAK_FILE"
-    RESTORED=true
-    echo -e "  ${GREEN}✓${NC} 已从备份文件恢复官方出厂 Nodes.pm，并已清理备份残留。"
-elif grep -q "thermalstate" "$NODES_PM"; then
-    # 若无备份文件但存在修改，通过 python 安全剥离注入代码
-    python3 - << 'PYEOF'
-nodes_pm = '/usr/share/perl5/PVE/API2/Nodes.pm'
-with open(nodes_pm, 'r') as f:
-    text = f.read()
+    if perl -c "$BAK_FILE" &>/dev/null; then
+        cp -p "$BAK_FILE" "$TMP_FILE"
+        if perl -c "$TMP_FILE" &>/dev/null; then
+            mv -f "$TMP_FILE" "$NODES_PM"
+            rm -f "$BAK_FILE"
+            RESTORED=true
+            echo -e "  ${GREEN}✓${NC} 已从原始备份文件安全恢复官方出厂 Nodes.pm，并已清理备份残留。"
+        fi
+        rm -f "$TMP_FILE" 2>/dev/null || true
+    fi
+fi
 
-target = '        $res->{thermalstate} = `sensors -j 2>/dev/null`;\n'
-if target in text:
-    new_text = text.replace(target, '', 1)
-    with open(nodes_pm, 'w') as f:
-        f.write(new_text)
-    print("  \033[0;32m✓\033[0m 成功移除 Nodes.pm 中的 thermalstate 挂钩。")
+# 2. 若无备份文件或备份异常，通过 Python 安全逆向剥离所有修改
+if [ "$RESTORED" != true ]; then
+    echo -e "  ${YELLOW}ℹ️ 未检测到有效备份文件，正在通过语法逆向安全剥离挂钩...${NC}"
+    UNPATCH_RES=$(python3 - << 'PYEOF'
+import sys, re
+
+nodes_pm = '/usr/share/perl5/PVE/API2/Nodes.pm'
+tmp_file = '/usr/share/perl5/PVE/API2/Nodes.pm.pulse_tmp'
+
+try:
+    with open(nodes_pm, 'r', encoding='utf-8') as f:
+        text = f.read()
+
+    orig = text
+    # A. 移除 CPU 温度挂钩
+    text = re.sub(r'^\s*\$res->\{thermalstate\}\s*=\s*`sensors -j 2>/dev/null`;\r?\n?', '', text, flags=re.MULTILINE)
+    # B. 还原 Web Shell 免密登录判定为官方原始写法
+    text = re.sub(r"if\s*\(\s*\$user\s*eq\s*'root@pam'\s*\|\|\s*\$user\s*=~\s*/\^root\\@pam!/\s*\)", "if ($user eq 'root@pam')", text)
+
+    if text != orig:
+        with open(tmp_file, 'w', encoding='utf-8') as f:
+            f.write(text)
+        print("STRIPPED")
+    else:
+        print("ALREADY_CLEAN")
+except Exception as e:
+    print(f"ERROR: {e}")
+    sys.exit(1)
 PYEOF
-    RESTORED=true
-else
-    echo -e "  ${GREEN}✓${NC} Nodes.pm 已经是官方纯净文件，未检测到温度挂钩。"
+)
+    if echo "$UNPATCH_RES" | grep -q "STRIPPED"; then
+        if [ -f "$TMP_FILE" ] && perl -c "$TMP_FILE" &>/dev/null; then
+            mv -f "$TMP_FILE" "$NODES_PM"
+            RESTORED=true
+            echo -e "  ${GREEN}✓${NC} 挂钩已成功精准剥离，并通过 Perl 语法完整性校验！"
+        else
+            echo -e "  ${RED}❌ 剥离后语法校验异常，保护机制生效，未修改生产文件。${NC}"
+        fi
+        rm -f "$TMP_FILE" 2>/dev/null || true
+    else
+        echo -e "  ${GREEN}✓${NC} Nodes.pm 已经是官方纯净文件，未检测到任何挂钩残留。"
+    fi
 fi
 
 if [ "$RESTORED" = true ]; then
     echo -e "  🔄 正在重启 PVE API 服务 (pvedaemon, pveproxy)..."
     systemctl restart pvedaemon pveproxy
-    echo -e "  ${GREEN}✓${NC} 服务重启完成，PVE API 已完全恢复官方默认行为！"
+    echo -e "  ${GREEN}✓${NC} 服务重启完成，PVE API 已完全恢复官方默认出厂行为！"
 fi
 
 echo ""
