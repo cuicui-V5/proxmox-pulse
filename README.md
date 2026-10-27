@@ -213,14 +213,21 @@ server {
 
 ---
 
-## 🛠️ PVE 宿主机维护与还原
+## 🛠️ PVE 宿主机一键卸载与出厂还原
 
-如需恢复 PVE 官方出厂初始状态，随时在 PVE 宿主机 Shell 中执行单行命令：
+如需恢复 PVE 官方出厂纯净状态，随时在 PVE 宿主机 Shell 中粘贴执行专属卸载命令：
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve.sh | bash -s -- uninstall
+curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/uninstall-pve.sh | bash
 ```
-脚本将秒级恢复官方出厂文件并重启服务，零任何文件残留。
+
+> **该卸载脚本将为您：**
+> 1. 恢复 PVE 官方出厂原始 `Nodes.pm` 文件，彻底移除 CPU 温度挂钩；
+> 2. 清理 `Nodes.pm.bak` 备份文件，重启 `pvedaemon` 与 `pveproxy`；
+> 3. 询问或可选清理 API Token（`root@pam!dashboard`）；
+> 4. 秒级实现 **100% 官方原始出厂状态**，零残留文件、零副作用。
+>
+> *(如需非交互直接一并清理 Token，可加参数: `curl -sSL .../uninstall-pve.sh | bash -s -- --clean-token`)*
 
 ---
 
