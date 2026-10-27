@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Power, RotateCw, Square, Cpu, MemoryStick, HardDrive, Network, Clock, Monitor } from 'lucide-react';
+import { X, Power, RotateCw, Square, Cpu, MemoryStick, HardDrive, Network, Clock, Monitor, Zap } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import { ClusterResource, GuestDetail, GuestAction, RrdDataPoint } from '../types/pve';
 import { fetchGuestDetail, fetchGuestRrd } from '../api/client';
@@ -12,6 +12,7 @@ interface GuestDetailModalProps {
   onClose: () => void;
   onActionClick: (guest: ClusterResource, action: GuestAction) => void;
   onOpenConsole?: (guest: ClusterResource) => void;
+  onToggleOnBoot?: (guest: ClusterResource, nextOnboot: boolean) => void;
 }
 
 export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
@@ -19,7 +20,8 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
   guest,
   onClose,
   onActionClick,
-  onOpenConsole
+  onOpenConsole,
+  onToggleOnBoot
 }) => {
   if (!isOpen || !guest) return null;
 
@@ -138,6 +140,20 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
                 <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
                 <span>{isRunning ? `运行中 (${formatUptime(guest.uptime)})` : '已停止'}</span>
                 <span>• 节点: {guest.node}</span>
+                {onToggleOnBoot && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleOnBoot(guest, !guest.onboot)}
+                    className={`ml-1 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg border transition-all ${
+                      guest.onboot
+                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    <Zap className="w-3 h-3" />
+                    <span>{guest.onboot ? '自启动开启' : '自启动关闭'}</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

@@ -19,9 +19,10 @@ const PORT = process.env.PORT || 3333;
 app.use(cors());
 app.use(express.json());
 
-// Helper for caching guest IPs to keep requests snappy
+// Helper for caching guest IPs & onboot config to keep requests snappy
 const ipCache = new Map(); // vmid -> { ips: [], timestamp: number }
-const CACHE_TTL = 30000; // 30s cache for guest agent IPs
+const onbootCache = new Map(); // vmid -> { onboot: boolean, timestamp: number }
+const CACHE_TTL = 30000; // 30s cache
 
 // 1. Health check & PVE connectivity
 app.get('/api/health', async (req, res) => {
@@ -123,11 +124,26 @@ app.get('/api/guests', async (req, res) => {
     const resources = await pveClient.getClusterResources();
     const guests = resources.filter(r => r.type === 'qemu' || r.type === 'lxc');
 
-    // Enrich running QEMU guests with IP addresses asynchronously
+    // Enrich guests with IPs and onboot status asynchronously
     const now = Date.now();
     const enriched = await Promise.all(
       guests.map(async guest => {
         let ips = [];
+        let onboot = false;
+
+        // 1. Onboot configuration
+        const cachedOnboot = onbootCache.get(guest.vmid);
+        if (cachedOnboot && now - cachedOnboot.timestamp < CACHE_TTL) {
+          onboot = cachedOnboot.onboot;
+        } else {
+          try {
+            const cfg = await pveClient.getGuestConfig(guest.node, guest.type, guest.vmid);
+            onboot = cfg?.onboot === 1;
+            onbootCache.set(guest.vmid, { onboot, timestamp: now });
+          } catch {}
+        }
+
+        // 2. QEMU Guest Agent IPs
         if (guest.type === 'qemu' && guest.status === 'running') {
           const cached = ipCache.get(guest.vmid);
           if (cached && now - cached.timestamp < CACHE_TTL) {
@@ -154,7 +170,8 @@ app.get('/api/guests', async (req, res) => {
         }
         return {
           ...guest,
-          ips
+          ips,
+          onboot
         };
       })
     );
@@ -162,6 +179,22 @@ app.get('/api/guests', async (req, res) => {
     res.json({ ok: true, guests: enriched });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// 5.1 Toggle Guest Auto-start (onboot)
+app.post('/api/guests/:node/:type/:vmid/onboot', async (req, res) => {
+  const { node, type, vmid } = req.params;
+  const { onboot } = req.body;
+  try {
+    await pveClient.setGuestConfig(node, type, vmid, { onboot: onboot ? 1 : 0 });
+    onbootCache.set(parseInt(vmid, 10), { onboot: !!onboot, timestamp: Date.now() });
+    res.json({ ok: true, onboot: !!onboot, vmid: parseInt(vmid, 10), node });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.response?.data?.errors || err.message || 'Failed to update onboot'
+    });
   }
 });
 
@@ -274,6 +307,70 @@ app.get('/api/storage', async (req, res) => {
   }
 });
 
+// 10.1 Physical Disks & SMART Health Status
+app.get('/api/nodes/:node/disks', async (req, res) => {
+  const node = req.params.node || 'pve';
+  try {
+    const rawDisks = await pveClient.getDisksList(node);
+    const enriched = await Promise.all(
+      rawDisks.map(async (disk) => {
+        let smart = null;
+        let temp = null;
+        let powerOnHours = null;
+        try {
+          smart = await pveClient.getDiskSmart(node, disk.devpath);
+          const attrs = smart?.attributes || [];
+          const tempAttr = attrs.find(a => a.name?.toLowerCase().includes('temp'));
+          const hoursAttr = attrs.find(a => a.name?.toLowerCase().includes('power_on_hours'));
+          temp = tempAttr?.raw ? parseInt(tempAttr.raw, 10) : null;
+          powerOnHours = hoursAttr?.raw ? parseInt(hoursAttr.raw, 10) : null;
+        } catch {}
+        return {
+          ...disk,
+          smartHealth: smart?.health || disk.health || 'UNKNOWN',
+          temperature: temp,
+          powerOnHours
+        };
+      })
+    );
+    res.json({ ok: true, disks: enriched });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// 10.2 Host Power Management (reboot, shutdown)
+app.post('/api/nodes/:node/action', async (req, res) => {
+  const { node } = req.params;
+  const { command } = req.body;
+  if (!['reboot', 'shutdown'].includes(command)) {
+    return res.status(400).json({ ok: false, error: 'Command must be reboot or shutdown' });
+  }
+  try {
+    const result = await pveClient.executeNodeAction(node, command);
+    res.json({ ok: true, message: `Node ${node} ${command} initiated`, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.response?.data?.errors || err.message || 'Action failed' });
+  }
+});
+
+// 10.3 Host Web Shell Termproxy Ticket
+app.post('/api/nodes/:node/termproxy', async (req, res) => {
+  const { node } = req.params;
+  try {
+    const data = await pveClient.getHostTermProxy(node);
+    res.json({
+      ok: true,
+      port: data.port,
+      ticket: data.ticket,
+      user: data.user,
+      upid: data.upid
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.response?.data?.errors || err.message || 'Failed to start termproxy' });
+  }
+});
+
 // 11. Configuration endpoints
 app.get('/api/config', (req, res) => {
   res.json({ ok: true, config: pveClient.getConfig() });
@@ -334,6 +431,55 @@ server.on('upgrade', (req, socket, head) => {
             pveWs.send(msg, { binary: isBinary });
           } else {
             queue.push({ msg, isBinary });
+          }
+        });
+
+        pveWs.on('message', (msg, isBinary) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(msg, { binary: isBinary });
+          }
+        });
+
+        const cleanup = () => {
+          try { if (clientWs.readyState === WebSocket.OPEN) clientWs.close(); } catch {}
+          try { if (pveWs.readyState === WebSocket.OPEN) pveWs.close(); } catch {}
+        };
+
+        clientWs.on('close', cleanup);
+        pveWs.on('close', cleanup);
+        clientWs.on('error', () => cleanup());
+        pveWs.on('error', () => cleanup());
+      });
+    } else if (url.pathname === '/api/term-ws') {
+      const port = url.searchParams.get('port');
+      const ticket = url.searchParams.get('ticket');
+      const node = url.searchParams.get('node');
+      const user = url.searchParams.get('user') || pveClient.tokenId;
+
+      if (!port || !ticket || !node) {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      wss.handleUpgrade(req, socket, head, (clientWs) => {
+        const pveWsUrl = `wss://${pveClient.host}:${pveClient.port}/api2/json/nodes/${node}/vncwebsocket?port=${port}&vncticket=${encodeURIComponent(ticket)}`;
+
+        const pveWs = new WebSocket(pveWsUrl, {
+          rejectUnauthorized: pveClient.verifySsl,
+          headers: {
+            'Authorization': `PVEAPIToken=${pveClient.tokenId}=${pveClient.tokenSecret}`
+          }
+        });
+
+        pveWs.on('open', () => {
+          // Send PVE termproxy initial authentication handshake
+          pveWs.send(`${user}:${ticket}\n`);
+        });
+
+        clientWs.on('message', (msg, isBinary) => {
+          if (pveWs.readyState === WebSocket.OPEN) {
+            pveWs.send(msg, { binary: isBinary });
           }
         });
 

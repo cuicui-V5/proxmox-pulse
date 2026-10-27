@@ -77,6 +77,24 @@ export interface ClusterResource {
   shared?: number;
   content?: string;
   ips?: string[];
+  onboot?: boolean;
+}
+
+export interface PhysicalDisk {
+  devpath: string;
+  model: string;
+  serial?: string;
+  size: number;
+  type: string;
+  wearout?: number;
+  health?: string;
+  smartHealth?: string;
+  temperature?: number | null;
+  powerOnHours?: number | null;
+  used?: string;
+  vendor?: string;
+  gpt?: number;
+  rpm?: number;
 }
 
 export interface StorageInfo {

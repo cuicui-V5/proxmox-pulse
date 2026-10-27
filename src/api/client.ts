@@ -109,3 +109,48 @@ export async function requestVncProxy(
   });
   return res.json();
 }
+
+export async function setGuestOnBoot(
+  node: string,
+  type: string,
+  vmid: number,
+  onboot: boolean
+): Promise<{ ok: boolean; onboot: boolean; error?: string }> {
+  const res = await fetch(`${BASE_URL}/guests/${node}/${type}/${vmid}/onboot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ onboot })
+  });
+  return res.json();
+}
+
+export async function fetchNodeDisks(node: string) {
+  const res = await fetch(`${BASE_URL}/nodes/${node}/disks`);
+  return res.json();
+}
+
+export async function executeNodeAction(
+  node: string,
+  command: 'reboot' | 'shutdown'
+): Promise<{ ok: boolean; message?: string; error?: string }> {
+  const res = await fetch(`${BASE_URL}/nodes/${node}/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command })
+  });
+  return res.json();
+}
+
+export async function requestHostTermProxy(node: string): Promise<{
+  ok: boolean;
+  port?: string;
+  ticket?: string;
+  user?: string;
+  upid?: string;
+  error?: string;
+}> {
+  const res = await fetch(`${BASE_URL}/nodes/${node}/termproxy`, {
+    method: 'POST'
+  });
+  return res.json();
+}

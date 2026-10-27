@@ -144,6 +144,40 @@ class PveClient {
     });
     return res.data?.data;
   }
+
+  async setGuestConfig(node, type, vmid, config) {
+    const res = await this.axios.put(`/nodes/${node}/${type}/${vmid}/config`, config);
+    return res.data?.data;
+  }
+
+  async getDisksList(node) {
+    const res = await this.axios.get(`/nodes/${node}/disks/list`);
+    return res.data?.data || [];
+  }
+
+  async getDiskSmart(node, disk) {
+    try {
+      const res = await this.axios.get(`/nodes/${node}/disks/smart`, {
+        params: { disk }
+      });
+      return res.data?.data;
+    } catch {
+      return null;
+    }
+  }
+
+  async executeNodeAction(node, command) {
+    if (!['reboot', 'shutdown'].includes(command)) {
+      throw new Error(`Invalid host command: ${command}`);
+    }
+    const res = await this.axios.post(`/nodes/${node}/status`, { command });
+    return res.data?.data;
+  }
+
+  async getHostTermProxy(node) {
+    const res = await this.axios.post(`/nodes/${node}/termproxy`);
+    return res.data?.data;
+  }
 }
 
 export default new PveClient();

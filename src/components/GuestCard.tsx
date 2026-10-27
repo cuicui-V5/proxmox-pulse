@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick, ChevronRight, Monitor } from 'lucide-react';
+import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick, ChevronRight, Monitor, Zap } from 'lucide-react';
 import { ClusterResource, GuestAction } from '../types/pve';
 import { formatBytes, formatUptime } from '../utils/formatters';
 import { getOsInfo } from '../utils/osIcons';
@@ -9,13 +9,15 @@ interface GuestCardProps {
   onActionClick: (guest: ClusterResource, action: GuestAction) => void;
   onOpenDetail: (guest: ClusterResource) => void;
   onOpenConsole?: (guest: ClusterResource) => void;
+  onToggleOnBoot?: (guest: ClusterResource, nextOnboot: boolean) => void;
 }
 
 export const GuestCard: React.FC<GuestCardProps> = ({
   guest,
   onActionClick,
   onOpenDetail,
-  onOpenConsole
+  onOpenConsole,
+  onToggleOnBoot
 }) => {
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
 
@@ -60,6 +62,26 @@ export const GuestCard: React.FC<GuestCardProps> = ({
               {osInfo.icon}
               {osInfo.label}
             </span>
+
+            {/* Auto-start Badge */}
+            {onToggleOnBoot && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleOnBoot(guest, !guest.onboot);
+                }}
+                title={guest.onboot ? "开机自启: 已开启 (点击关闭)" : "开机自启: 已关闭 (点击开启)"}
+                className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition-all ${
+                  guest.onboot
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                <Zap className="w-3 h-3" />
+                <span>{guest.onboot ? '自启动' : '无自启'}</span>
+              </button>
+            )}
           </div>
 
           {/* Status Indicator */}

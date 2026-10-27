@@ -1,5 +1,5 @@
 import React from 'react';
-import { Server, RefreshCw, Settings, Search, Sun, Moon } from 'lucide-react';
+import { Server, RefreshCw, Settings, Search, Sun, Moon, Terminal, Power } from 'lucide-react';
 import { PveVersion } from '../types/pve';
 
 interface HeaderProps {
@@ -15,6 +15,8 @@ interface HeaderProps {
   onToggleTheme: () => void;
   onOpenSettings: () => void;
   onOpenNodeDetails: () => void;
+  onOpenHostShell?: () => void;
+  onOpenHostPower?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,7 +31,9 @@ export const Header: React.FC<HeaderProps> = ({
   isDark,
   onToggleTheme,
   onOpenSettings,
-  onOpenNodeDetails
+  onOpenNodeDetails,
+  onOpenHostShell,
+  onOpenHostPower
 }) => {
   return (
     <header className="sticky top-0 z-30 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800 transition-colors shadow-sm">
@@ -110,6 +114,29 @@ export const Header: React.FC<HeaderProps> = ({
               <option value={0} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">暂停</option>
             </select>
           </div>
+
+          {/* Host Web Shell Button */}
+          {onOpenHostShell && (
+            <button
+              onClick={onOpenHostShell}
+              title="打开 PVE 宿主机 Web Shell 终端"
+              className="px-2.5 py-1.5 rounded-xl bg-slate-900 dark:bg-slate-800 text-orange-400 hover:text-white border border-slate-700 hover:border-orange-500/50 text-xs font-mono font-semibold inline-flex items-center gap-1.5 transition-all shadow-sm"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Shell</span>
+            </button>
+          )}
+
+          {/* Host Power Button */}
+          {onOpenHostPower && (
+            <button
+              onClick={onOpenHostPower}
+              title="PVE 宿主机电源操作 (重启 / 关机)"
+              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800/80 hover:bg-rose-50 dark:hover:bg-rose-500/10 hover:text-rose-600 dark:hover:text-rose-400 border border-slate-200 dark:border-slate-700/60 text-slate-600 dark:text-slate-300 transition-colors"
+            >
+              <Power className="w-4 h-4" />
+            </button>
+          )}
 
           {/* Settings Modal Button */}
           <button

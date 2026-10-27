@@ -11,13 +11,16 @@ import { GuestDetailModal } from './components/GuestDetailModal';
 import { NodeDetailsModal } from './components/NodeDetailsModal';
 import { SettingsModal } from './components/SettingsModal';
 import { VncConsoleModal } from './components/VncConsoleModal';
+import { HostPowerModal } from './components/HostPowerModal';
+import { HostShellModal } from './components/HostShellModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 
 import {
   fetchOverview,
   fetchGuests,
   executeGuestAction,
-  pollTaskStatus
+  pollTaskStatus,
+  setGuestOnBoot
 } from './api/client';
 import {
   ClusterResource,
@@ -83,6 +86,8 @@ export const App: React.FC = () => {
   const [consoleGuest, setConsoleGuest] = useState<ClusterResource | null>(null);
   const [isNodeDetailsOpen, setIsNodeDetailsOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isHostPowerOpen, setIsHostPowerOpen] = useState<boolean>(false);
+  const [isHostShellOpen, setIsHostShellOpen] = useState<boolean>(false);
 
   // Toasts
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -270,6 +275,40 @@ export const App: React.FC = () => {
     }
   };
 
+  // Toggle guest onboot configuration
+  const handleToggleOnBoot = async (guest: ClusterResource, nextOnboot: boolean) => {
+    // Optimistic UI update
+    setGuests((prev) =>
+      prev.map((g) => (g.vmid === guest.vmid ? { ...g, onboot: nextOnboot } : g))
+    );
+    if (detailGuest && detailGuest.vmid === guest.vmid) {
+      setDetailGuest({ ...detailGuest, onboot: nextOnboot });
+    }
+
+    try {
+      const res = await setGuestOnBoot(guest.node, guest.type, guest.vmid!, nextOnboot);
+      if (!res.ok) throw new Error(res.error || '设置自启动失败');
+      addToast({
+        type: 'success',
+        title: '自启动设置成功',
+        description: `已${nextOnboot ? '开启' : '关闭'} ${guest.name} (#${guest.vmid}) 开机自启`
+      });
+    } catch (err: any) {
+      // Revert optimistic update
+      setGuests((prev) =>
+        prev.map((g) => (g.vmid === guest.vmid ? { ...g, onboot: !nextOnboot } : g))
+      );
+      if (detailGuest && detailGuest.vmid === guest.vmid) {
+        setDetailGuest({ ...detailGuest, onboot: !nextOnboot });
+      }
+      addToast({
+        type: 'error',
+        title: '自启动设置失败',
+        description: err.message
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex flex-col font-sans transition-colors">
       {/* Navbar Header */}
@@ -286,6 +325,8 @@ export const App: React.FC = () => {
         onToggleTheme={() => setIsDark(!isDark)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenNodeDetails={() => setIsNodeDetailsOpen(true)}
+        onOpenHostShell={() => setIsHostShellOpen(true)}
+        onOpenHostPower={() => setIsHostPowerOpen(true)}
       />
 
       {/* Main Container */}
@@ -402,6 +443,7 @@ export const App: React.FC = () => {
                   onActionClick={handleOpenActionModal}
                   onOpenDetail={setDetailGuest}
                   onOpenConsole={setConsoleGuest}
+                  onToggleOnBoot={handleToggleOnBoot}
                 />
               ))}
             </div>
@@ -411,12 +453,13 @@ export const App: React.FC = () => {
               onActionClick={handleOpenActionModal}
               onOpenDetail={setDetailGuest}
               onOpenConsole={setConsoleGuest}
+              onToggleOnBoot={handleToggleOnBoot}
             />
           )}
         </div>
 
-        {/* 4. Storage Pools Section */}
-        <StorageOverview storages={storages} />
+        {/* 4. Storage Pools & Physical Disks Section */}
+        <StorageOverview storages={storages} nodeName={primaryNode} />
       </main>
 
       {/* Footer */}
@@ -456,12 +499,32 @@ export const App: React.FC = () => {
           setDetailGuest(null);
           handleOpenActionModal(g, a);
         }}
+        onToggleOnBoot={handleToggleOnBoot}
       />
 
       <VncConsoleModal
         isOpen={!!consoleGuest}
         guest={consoleGuest}
         onClose={() => setConsoleGuest(null)}
+      />
+
+      <HostPowerModal
+        isOpen={isHostPowerOpen}
+        nodeName={primaryNode}
+        onClose={() => setIsHostPowerOpen(false)}
+        onSuccess={(action) => {
+          addToast({
+            type: 'warning',
+            title: '宿主机指令已发送',
+            description: `已成功向宿主机 ${primaryNode} 发送${action === 'reboot' ? '重启' : '关机'}指令`
+          });
+        }}
+      />
+
+      <HostShellModal
+        isOpen={isHostShellOpen}
+        nodeName={primaryNode}
+        onClose={() => setIsHostShellOpen(false)}
       />
 
       <NodeDetailsModal

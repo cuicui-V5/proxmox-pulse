@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick, Monitor } from 'lucide-react';
+import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick, Monitor, Zap } from 'lucide-react';
 import { ClusterResource, GuestAction } from '../types/pve';
 import { formatBytes, formatUptime } from '../utils/formatters';
 import { getOsInfo } from '../utils/osIcons';
@@ -9,13 +9,15 @@ interface GuestTableProps {
   onActionClick: (guest: ClusterResource, action: GuestAction) => void;
   onOpenDetail: (guest: ClusterResource) => void;
   onOpenConsole?: (guest: ClusterResource) => void;
+  onToggleOnBoot?: (guest: ClusterResource, nextOnboot: boolean) => void;
 }
 
 export const GuestTable: React.FC<GuestTableProps> = ({
   guests,
   onActionClick,
   onOpenDetail,
-  onOpenConsole
+  onOpenConsole,
+  onToggleOnBoot
 }) => {
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
 
@@ -39,6 +41,7 @@ export const GuestTable: React.FC<GuestTableProps> = ({
               <th className="py-3 px-4">CPU 使用</th>
               <th className="py-3 px-4">内存已用</th>
               <th className="py-3 px-4">运行时间</th>
+              <th className="py-3 px-4">自启</th>
               <th className="py-3 px-4 text-right">操作</th>
             </tr>
           </thead>
@@ -153,6 +156,24 @@ export const GuestTable: React.FC<GuestTableProps> = ({
                   {/* Uptime */}
                   <td className="py-3 px-4 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 font-mono">
                     {isRunning ? formatUptime(guest.uptime) : '已离线'}
+                  </td>
+
+                  {/* Auto-start OnBoot */}
+                  <td className="py-3 px-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    {onToggleOnBoot && (
+                      <button
+                        onClick={() => onToggleOnBoot(guest, !guest.onboot)}
+                        title={guest.onboot ? "开机自启已开启 (点击关闭)" : "未开启自启 (点击开启)"}
+                        className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-lg border transition-all ${
+                          guest.onboot
+                            ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                        }`}
+                      >
+                        <Zap className="w-3 h-3" />
+                        <span>{guest.onboot ? '开启' : '关闭'}</span>
+                      </button>
+                    )}
                   </td>
 
                   {/* Actions */}
