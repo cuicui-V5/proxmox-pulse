@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  pve-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: pve-pulse-dashboard:latest
+    container_name: pve-pulse-dashboard
+    restart: unless-stopped
+    ports:
+      - "3333:3333"
+    environment:
+      - PORT=3333
+      - NODE_ENV=production
+      - SERVE_STATIC=true
+      - PVE_HOST=192.168.2.5
+      - PVE_PORT=8006
+      - PVE_TOKEN_ID=root@pam!dashboard
+      - PVE_TOKEN_SECRET=84f861de-7435-4985-9ff4-af03419b8781
+      - PVE_VERIFY_SSL=false

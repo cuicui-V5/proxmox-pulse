@@ -1,0 +1,41 @@
+{
+  "name": "proxmox-pulse-dashboard",
+  "version": "1.0.0",
+  "description": "Modern, minimalist, full-featured Proxmox VE Dashboard",
+  "type": "module",
+  "scripts": {
+    "dev:frontend": "vite",
+    "dev:server": "node server/index.js",
+    "dev": "concurrently -k -n \"FE,BE\" -c \"cyan,magenta\" \"npm run dev:frontend\" \"npm run dev:server\"",
+    "build": "vite build",
+    "start": "NODE_ENV=production node server/index.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "clsx": "^2.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "echarts": "^5.6.0",
+    "echarts-for-react": "^3.0.2",
+    "express": "^4.21.2",
+    "lucide-react": "^0.475.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ssh2": "^1.17.0",
+    "tailwind-merge": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "@types/ssh2": "^1.15.6",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.5.2",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.0"
+  }
+}
