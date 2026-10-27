@@ -2,16 +2,18 @@
 
 <div align="center">
 
-![Proxmox Pulse](https://img.shields.io/badge/Proxmox_VE-9.x_%7C_8.x-E57000?style=for-the-badge&logo=proxmox&logoColor=white)
+![Proxmox Pulse](https://img.shields.io/badge/Proxmox_VE-9.x_%7C_8.x_%7C_7.x-E57000?style=for-the-badge&logo=proxmox&logoColor=white)
 ![React](https://img.shields.io/badge/React_18-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![xterm.js](https://img.shields.io/badge/xterm.js-6.x-F97316?style=for-the-badge&logo=gnometerminal&logoColor=white)
+![noVNC](https://img.shields.io/badge/noVNC-HTML5-0284C7?style=for-the-badge)
 ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
 <p align="center">
   <b>现代 • 简约 • 极速 • 全功能的 Proxmox VE 监控管理面板</b>
   <br />
-  实时状态感知 / 原生 HTML5 VNC 远程控制台 / CPU 核心温度监控 / RRD 历史性能曲线 / QEMU Guest Agent IP 自动发现 / 虚拟机电源控制
+  PVE 宿主机免密 Web Shell / 原生 HTML5 VNC 远程控制台 / 物理磁盘与 SMART 健康度 (Wearout%) / 虚拟机开机自启一键切换 / 宿主机防误触电源管理 / CPU 核心温度监控 / RRD 历史性能趋势
 </p>
 
 </div>
@@ -20,39 +22,44 @@
 
 ## 🌟 功能特性 (Features)
 
-- 🎨 **现代简约双主题**：默认清爽浅色模式，支持一键切换高级暗黑模式，兼顾桌面宽屏与移动端响应式体验。
+Proxmox Pulse 旨在为您提供远超官方 WebUI 的现代、极速、高颜值日常运维体验，彻底摆脱传统管理界面的笨重与老旧：
+
+- 🎨 **现代极简双主题**：
+  - 默认清爽明亮浅色模式，支持一键切换质感深邃暗黑模式。
+  - 完美响应式设计，PC 宽屏、平板、手机移动端均拥有丝滑流畅的交互与极佳排版。
 - 📟 **PVE 宿主机免密 Web Shell (xterm.js)**：
-  - 零客户端、零 SSH 端口暴露，直接在浏览器中秒级唤起 PVE 宿主机原生 Linux 控制台。
-  - 基于 xterm.js + 官方 `termproxy` 实时双向 WebSocket 隧道，全功能 PTY 终端交互。
+  - **零客户端、零 SSH 依赖、零 22 端口暴露**：直接在浏览器中秒级唤起 PVE 宿主机原生 Linux 终端。
+  - 基于 xterm.js + PVE 官方 `termproxy` 实时双向 WebSocket 隧道，全功能 PTY 终端交互。
+  - **免密直进 Root**：无缝映射 API Token 凭证，免去重复输入账号密码的繁琐，秒进 `root@pve:~#`。
   - 完美支持自适应窗口尺寸 (Fit Addon)、一键全屏沉浸、ANSI 全彩输出、会话心跳保活与断线重连。
-- 💾 **宿主机物理磁盘与 SMART 健康度 / 磨损率 (Wearout)**：
-  - 全盘感知：直观展示 NVMe/SATA 物理硬盘型号、序列号、接口类型、容量与分区。
-  - SMART 全方位体检：硬盘健康评级（PASSED/良好）、**SSD 寿命磨损百分比 (Wearout %)**、**实时硬盘温度** 与 **累计通电运行小时数**。
-- ⚡ **虚拟机 / 容器开机自启动开关 (OnBoot Toggle)**：
-  - 在仪表盘卡片、列表表格及详情抽屉中，均支持一键切换开机自启动状态。
-  - 实时同步 PVE 底层 `onboot` 硬件配置，具备乐观更新与异常回滚机制。
-- 🛑 **宿主机安全电源管理 (Reboot / Shutdown)**：
-  - 随时对 PVE 宿主机下发优雅软重启与安全关机指令。
-  - **银行级防误触保护**：弹出红色高危警示，必须手动键入宿主机节点名称（如 `pve`）方可解锁操作，彻底规避手滑灾难。
+- 💾 **宿主机物理磁盘与 SMART 健康度 / SSD 磨损率 (Wearout %)**：
+  - **全盘硬件感知**：自动识别 NVMe / SATA 物理硬盘型号、序列号、容量与接口类型。
+  - **SMART 深度体检**：直观展示硬盘健康评级（`PASSED` / 良好）。
+  - **SSD 寿命磨损百分比 (Wearout %)**：带健康渐变进度条，固态硬盘寿命与损耗状况一目了然。
+  - **实时盘温与通电时长**：展示磁盘当前实时运行温度（°C）与累计通电运行小时数（Power-On Hours）。
+- ⚡ **虚拟机 / LXC 容器开机自启开关 (OnBoot Toggle)**：
+  - 在仪表盘卡片、列表表格以及虚拟机详情抽屉中，均支持一键切换开机自启动配置。
+  - 实时双向同步 PVE 底层 `onboot` 硬件配置，具备乐观 UI 更新与异常回滚机制。
+- 🛑 **宿主机安全电源管理 (优雅重启 / 彻底关机)**：
+  - 随时对 PVE 宿主机下发优雅软重启与安全 ACPI 关机指令。
+  - **银行级防误触保护**：弹出红色高危警示，**必须手动键入宿主机节点名称（如 `pve`）方可解锁操作**，彻底规避手滑灾难。
 - 🖥️ **原生 HTML5 VNC 远程控制台 (noVNC)**：
   - 零客户端、零插件，直接在浏览器中秒级唤起虚拟机或容器控制台。
-  - 支持 **自适应缩放 (Scale to Fit) / 1:1 原始分辨率** 及 **一键全屏沉浸操作**。
+  - Canvas 硬件加速渲染，支持 **自适应缩放 (Scale to Fit) / 1:1 原始分辨率** 及 **一键全屏沉浸操作**。
   - 贴心运维工具栏：一键发送 `Ctrl + Alt + Del`、Windows 键、Escape、Tab 等系统特殊键，支持远程剪贴板文本写入。
   - 架构极致安全：通过面板后端 WebSocket 隧道智能中继，**无需在宿主机额外开放 VNC 端口**，也无需直接暴露 PVE 8006 端口。
 - 🌡️ **宿主机 CPU 核心温度监控 (PVE 原生 REST API)**：
-  - 100% 纯 API Token 免密通信，支持 Intel Core/Package、AMD Ryzen/EPYC 及 ACPI 传感器，直观展示整机与各核心温度分布。
+  - 100% 纯 API Token 通信，支持 Intel Core/Package、AMD Ryzen/EPYC 及 ACPI 传感器，直观展示整机与各核心温度分布。
   - 零 SSH 依赖，零网络开销，不影响 Debian/PVE 后续系统升级。
-- 📈 **PVE 原生 RRD 历史性能趋势**：无缝对接 PVE 内部高精度 RRD 引擎，提供 **1小时 / 24小时 / 7天 / 30天 / 1年** 粒度曲线：
-  - CPU 使用率与 IO 等待 (iowait)
-  - 内存已用与配额变化 (RAM Used vs Quota)
-  - 网络实时吞吐速率 (流入 Rx / 流出 Tx)
-  - 磁盘 I/O 吞吐速率 (Read / Write)
+- 📈 **PVE 原生 RRD 历史性能趋势**：
+  - 无缝对接 PVE 内部高精度 RRD 引擎，提供 **1小时 / 24小时 / 7天 / 30天 / 1年** 粒度曲线：
+    - CPU 使用率与 IO 等待 (iowait)
+    - 内存已用与配额变化 (RAM Used vs Quota)
+    - 网络实时吞吐速率 (流入 Rx / 流出 Tx)
+    - 磁盘 I/O 吞吐速率 (Read / Write)
 - 🌐 **QEMU Guest Agent 自动感知**：无需手动记录 IP，自动发现虚拟机真实内网 IP 地址，支持一键点击复制。
 - ⚡ **安全全功能虚拟机电源管理**：
-  - ACPI 优雅关机 (Shutdown)
-  - 软重启 (Reboot)
-  - 强制断电 (Stop) 与 强制复位 (Reset)（带双重防误触二次确认保护）
-  - 开机启动 (Start)
+  - ACPI 优雅关机 (Shutdown)、软重启 (Reboot)、强制断电 (Stop)、强制复位 (Reset)、开机启动 (Start)。
   - UPID 异步任务进度自动跟踪与轻量 Toast 通知。
 - 🗄️ **存储池容量洞察**：直观展示 `local`、`local-lvm`、ZFS、NFS 等各存储池的使用率与配额。
 - 🔍 **多维快速检索与过滤**：支持按虚拟机名称、VMID、内网 IP 实时模糊过滤，支持卡片网格与紧凑表格双视图自由切换。
@@ -60,16 +67,25 @@
 
 ---
 
-## ❓ 常见疑问：VNC 远程控制台需要在 PVE 上安装后端吗？
+## ❓ 常见疑问与设计哲学 (FAQ)
 
+### 1. VNC 远程控制台或 Web Shell 需要在 PVE 宿主机上安装什么额外后端吗？
 **答：完全不需要！**
+- **底层原理**：Proxmox VE 底层基于 QEMU/KVM 虚拟化，QEMU 天然开启了内部 VNC 显示；同时 PVE 官方出厂即内置了 `pveproxy`，提供将 VNC 画面与 Linux 终端转为 WebSocket 视频流与 PTY 交互的官方标准端点。
+- **架构实现**：面板后端仅通过官方标准的 API Token 发起会话请求，并在面板本地建立轻量 WebSocket 隧道与 PVE 原生端点对接，浏览器前端通过 Canvas 硬件加速渲染画面。
+- **结论**：PVE 宿主机 **零常驻守护进程、零额外服务端口**，开箱即用！
 
-- **为什么？**
-  Proxmox VE 底层基于 QEMU/KVM 虚拟化，QEMU 在创建虚拟机时**天然在底层开启了 VNC 显示服务**；同时 PVE 官方出厂即内置了 `pveproxy`，提供将 VNC 画面转为 WebSocket 视频流的官方标准端点。
-- **Proxmox Pulse 如何实现？**
-  面板后端仅通过官方标准的 API Token 发起请求，并在本地启动轻量 WebSocket 隧道与 PVE 原生端点对接，浏览器前端通过 Canvas 硬件加速渲染画面。
-- **结论**：
-  PVE 宿主机 **零依赖、零插件、零额外守护进程**，开箱即用！
+### 2. PVE 宿主机免密 Web Shell 是如何实现的？改动安全吗？
+- PVE 官方在调用 `termproxy` 时，只有用户变量完全等于 `root@pam` 时才会自动执行 `/bin/login -f root`（`-f root` 为 Linux 免密以 root 身份登入终端）；而第三方工具通过 API Token 通信时用户名带有后缀（如 `root@pam!dashboard`），PVE 官方源码默认会退化为普通的交互式 `/bin/login`（要求输入 Linux 账号密码）。
+- `setup-pve.sh` 仅在 PVE 原生 `/usr/share/perl5/PVE/API2/Nodes.pm` 中增加了一个判断扩展，允许由 `root@pam` 派生的 API Token 也享受 `-f root` 免密直进，实现与官方 WebUI 完全一致的秒级终端体验。
+
+### 3. 一键配置脚本有何安全保障机制？会不会搞坏 PVE 系统文件？
+`setup-pve.sh` 拥有 **5 重防损坏与编译期校验机制**：
+1. **基准备份预检**：修改前强制通过 `perl -c Nodes.pm` 校验原文件完整性，仅备份 100% 健康的出厂文件。
+2. **沙箱隔离写入**：所有变更均先写入临时文件 `Nodes.pm.pulse_tmp`，绝不直接操作线上文件。
+3. **编译期严格语法检查**：在替换前，强制调用系统级 `perl -c Nodes.pm.pulse_tmp` 编译检查。**一旦语法有任何异常，保护机制立即销毁临时文件并退出，生产文件毫发无损**。
+4. **原子替换写入**：校验通过后通过 `mv -f` 瞬间原子写入，避免进程中断或断电引起文件半写。
+5. **全面幂等性设计**：支持任意多次重复运行，已生效的挂钩自动跳过，绝不重复插入代码。
 
 ---
 
@@ -91,6 +107,8 @@ curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-p
 > 3. 校验并确认 VNC 远程控制台原生就绪；
 > 4. 自动生成专属受限 API Token（`root@pam!dashboard`）；
 > 5. 终端直接打印出**属于您这台 PVE 机器的现成 Docker 启动命令与 Token 密钥**！
+
+*(常用可选参数：`bash setup-pve.sh --recreate-token` 重新生成密钥；`bash setup-pve.sh --thermal-only` 仅开启 API 扩展跳过 Token；`bash setup-pve.sh uninstall` 一键出厂还原)*
 
 ---
 
@@ -191,13 +209,13 @@ npm run dev
 
 ---
 
-## 🌐 反向代理与公网穿透说明 (Nginx / Caddy / 1Panel)
+## 🌐 反向代理与公网安全访问 (Nginx / Caddy / 1Panel)
 
 > [!IMPORTANT]
 > **您只需要反向代理面板自身的 `3333` 端口！**
-> 完全不需要将 PVE 的 `8006` 端口或任何 VNC 端口暴露到公网，面板后端会自动将 VNC 流量与 API 请求封装为内部长连接。
+> 完全不需要将 PVE 的 `8006` 端口、SSH 22 端口或任何 VNC 端口暴露到公网，面板后端会自动将 noVNC 远程桌面流、xterm.js Web Shell 与 API 请求封装为内部安全隧道。
 
-### Nginx 反代配置示例 (需开启 WebSocket 支持)
+### 1. Nginx 反代配置示例 (需开启 WebSocket 支持)
 
 ```nginx
 server {
@@ -208,7 +226,7 @@ server {
         proxy_pass http://127.0.0.1:3333;
         proxy_http_version 1.1;
 
-        # 核心：支持 noVNC WebSocket 隧道长连接
+        # 核心：支持 noVNC 与 xterm.js 终端的 WebSocket 长连接
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
@@ -223,6 +241,15 @@ server {
     }
 }
 ```
+
+### 2. Caddy 反代配置示例
+
+```caddy
+pve.yourdomain.com {
+    reverse_proxy 127.0.0.1:3333
+}
+```
+*(Caddy 默认原生自动支持 WebSocket 流与自动申请 HTTPS 证书)*
 
 ---
 
