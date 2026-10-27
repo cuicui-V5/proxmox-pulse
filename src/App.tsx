@@ -10,6 +10,7 @@ import { ActionConfirmModal } from './components/ActionConfirmModal';
 import { GuestDetailModal } from './components/GuestDetailModal';
 import { NodeDetailsModal } from './components/NodeDetailsModal';
 import { SettingsModal } from './components/SettingsModal';
+import { VncConsoleModal } from './components/VncConsoleModal';
 import { ToastContainer, ToastMessage } from './components/Toast';
 
 import {
@@ -79,6 +80,7 @@ export const App: React.FC = () => {
   const [isActionExecuting, setIsActionExecuting] = useState<boolean>(false);
 
   const [detailGuest, setDetailGuest] = useState<ClusterResource | null>(null);
+  const [consoleGuest, setConsoleGuest] = useState<ClusterResource | null>(null);
   const [isNodeDetailsOpen, setIsNodeDetailsOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
 
@@ -399,6 +401,7 @@ export const App: React.FC = () => {
                   guest={guest}
                   onActionClick={handleOpenActionModal}
                   onOpenDetail={setDetailGuest}
+                  onOpenConsole={setConsoleGuest}
                 />
               ))}
             </div>
@@ -407,6 +410,7 @@ export const App: React.FC = () => {
               guests={filteredGuests}
               onActionClick={handleOpenActionModal}
               onOpenDetail={setDetailGuest}
+              onOpenConsole={setConsoleGuest}
             />
           )}
         </div>
@@ -444,10 +448,20 @@ export const App: React.FC = () => {
         isOpen={!!detailGuest}
         guest={detailGuest}
         onClose={() => setDetailGuest(null)}
+        onOpenConsole={(g) => {
+          setDetailGuest(null);
+          setConsoleGuest(g);
+        }}
         onActionClick={(g, a) => {
           setDetailGuest(null);
           handleOpenActionModal(g, a);
         }}
+      />
+
+      <VncConsoleModal
+        isOpen={!!consoleGuest}
+        guest={consoleGuest}
+        onClose={() => setConsoleGuest(null)}
       />
 
       <NodeDetailsModal

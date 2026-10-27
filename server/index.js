@@ -1,8 +1,10 @@
 import express from 'express';
+import http from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import WebSocket, { WebSocketServer } from 'ws';
 import pveClient from './pveClient.js';
 import thermalService from './thermalService.js';
 
@@ -11,6 +13,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 const app = express();
+const server = http.createServer(app);
 const PORT = process.env.PORT || 3333;
 
 app.use(cors());
@@ -227,6 +230,28 @@ app.post('/api/guests/:node/:type/:vmid/action', async (req, res) => {
   }
 });
 
+// 8.1 Request VNC Proxy Ticket
+app.post('/api/guests/:node/:type/:vmid/vncproxy', async (req, res) => {
+  const { node, type, vmid } = req.params;
+  try {
+    const data = await pveClient.getVncProxy(node, type, vmid);
+    res.json({
+      ok: true,
+      ticket: data.ticket,
+      port: data.port,
+      password: data.password,
+      cert: data.cert,
+      user: data.user,
+      upid: data.upid
+    });
+  } catch (err) {
+    res.status(500).json({
+      ok: false,
+      error: err.response?.data?.errors || err.message || 'Failed to initialize VNC proxy'
+    });
+  }
+});
+
 // 9. Task status polling
 app.get('/api/tasks/:node/:upid', async (req, res) => {
   const { node, upid } = req.params;
@@ -264,6 +289,78 @@ app.post('/api/config', async (req, res) => {
   }
 });
 
+// 12. WebSocket Proxy for noVNC
+const wss = new WebSocketServer({ noServer: true });
+
+server.on('upgrade', (req, socket, head) => {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if (url.pathname === '/api/vnc-ws') {
+      const port = url.searchParams.get('port');
+      const ticket = url.searchParams.get('ticket');
+      const vmid = url.searchParams.get('vmid');
+      const node = url.searchParams.get('node');
+      const type = url.searchParams.get('type') || 'qemu';
+
+      if (!port || !ticket || !vmid || !node) {
+        socket.write('HTTP/1.1 400 Bad Request\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      wss.handleUpgrade(req, socket, head, (clientWs) => {
+        const pveWsUrl = `wss://${pveClient.host}:${pveClient.port}/api2/json/nodes/${node}/${type}/${vmid}/vncwebsocket?port=${port}&vncticket=${encodeURIComponent(ticket)}`;
+
+        const pveWs = new WebSocket(pveWsUrl, {
+          rejectUnauthorized: pveClient.verifySsl,
+          headers: {
+            'Authorization': `PVEAPIToken=${pveClient.tokenId}=${pveClient.tokenSecret}`
+          }
+        });
+
+        const queue = [];
+        let isPveOpen = false;
+
+        pveWs.on('open', () => {
+          isPveOpen = true;
+          while (queue.length > 0) {
+            const item = queue.shift();
+            pveWs.send(item.msg, { binary: item.isBinary });
+          }
+        });
+
+        clientWs.on('message', (msg, isBinary) => {
+          if (isPveOpen && pveWs.readyState === WebSocket.OPEN) {
+            pveWs.send(msg, { binary: isBinary });
+          } else {
+            queue.push({ msg, isBinary });
+          }
+        });
+
+        pveWs.on('message', (msg, isBinary) => {
+          if (clientWs.readyState === WebSocket.OPEN) {
+            clientWs.send(msg, { binary: isBinary });
+          }
+        });
+
+        const cleanup = () => {
+          try { if (clientWs.readyState === WebSocket.OPEN) clientWs.close(); } catch {}
+          try { if (pveWs.readyState === WebSocket.OPEN) pveWs.close(); } catch {}
+        };
+
+        clientWs.on('close', cleanup);
+        pveWs.on('close', cleanup);
+        clientWs.on('error', () => cleanup());
+        pveWs.on('error', () => cleanup());
+      });
+    } else {
+      socket.destroy();
+    }
+  } catch {
+    socket.destroy();
+  }
+});
+
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true') {
   const distPath = path.join(__dirname, '../dist');
@@ -273,7 +370,7 @@ if (process.env.NODE_ENV === 'production' || process.env.SERVE_STATIC === 'true'
   });
 }
 
-app.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`[PVE Dashboard Server] Running on http://0.0.0.0:${PORT}`);
   console.log(`[PVE Target] Connecting to https://${pveClient.host}:${pveClient.port}`);
 });

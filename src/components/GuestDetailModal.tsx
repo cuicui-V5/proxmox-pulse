@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Power, RotateCw, Square, Cpu, MemoryStick, HardDrive, Network, Clock } from 'lucide-react';
+import { X, Power, RotateCw, Square, Cpu, MemoryStick, HardDrive, Network, Clock, Monitor } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import { ClusterResource, GuestDetail, GuestAction, RrdDataPoint } from '../types/pve';
 import { fetchGuestDetail, fetchGuestRrd } from '../api/client';
@@ -11,13 +11,15 @@ interface GuestDetailModalProps {
   guest: ClusterResource | null;
   onClose: () => void;
   onActionClick: (guest: ClusterResource, action: GuestAction) => void;
+  onOpenConsole?: (guest: ClusterResource) => void;
 }
 
 export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
   isOpen,
   guest,
   onClose,
-  onActionClick
+  onActionClick,
+  onOpenConsole
 }) => {
   if (!isOpen || !guest) return null;
 
@@ -142,6 +144,16 @@ export const GuestDetailModal: React.FC<GuestDetailModalProps> = ({
 
           {/* Quick Actions & Close */}
           <div className="flex items-center gap-2">
+            {isRunning && onOpenConsole && (
+              <button
+                onClick={() => onOpenConsole(guest)}
+                className="px-3 py-1.5 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm transition-all"
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span>控制台</span>
+              </button>
+            )}
+
             {isRunning ? (
               <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl border border-slate-200 dark:border-slate-700/60">
                 <button

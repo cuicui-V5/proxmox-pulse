@@ -137,6 +137,13 @@ class PveClient {
     const res = await this.axios.get(`/nodes/${node}/storage`);
     return res.data?.data || [];
   }
+
+  async getVncProxy(node, type, vmid) {
+    const res = await this.axios.post(`/nodes/${node}/${type}/${vmid}/vncproxy`, {
+      websocket: 1
+    });
+    return res.data?.data;
+  }
 }
 
 export default new PveClient();

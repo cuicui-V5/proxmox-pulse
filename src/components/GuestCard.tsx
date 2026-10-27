@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick, ChevronRight } from 'lucide-react';
+import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick, ChevronRight, Monitor } from 'lucide-react';
 import { ClusterResource, GuestAction } from '../types/pve';
 import { formatBytes, formatUptime } from '../utils/formatters';
 import { getOsInfo } from '../utils/osIcons';
@@ -8,12 +8,14 @@ interface GuestCardProps {
   guest: ClusterResource;
   onActionClick: (guest: ClusterResource, action: GuestAction) => void;
   onOpenDetail: (guest: ClusterResource) => void;
+  onOpenConsole?: (guest: ClusterResource) => void;
 }
 
 export const GuestCard: React.FC<GuestCardProps> = ({
   guest,
   onActionClick,
-  onOpenDetail
+  onOpenDetail,
+  onOpenConsole
 }) => {
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
 
@@ -179,6 +181,20 @@ export const GuestCard: React.FC<GuestCardProps> = ({
       >
         {isRunning ? (
           <>
+            {/* VNC Console */}
+            {onOpenConsole && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenConsole(guest);
+                }}
+                title="打开 VNC 控制台"
+                className="p-1.5 rounded-xl bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 border border-orange-200 dark:border-orange-500/30 text-orange-600 dark:text-orange-400 transition-colors"
+              >
+                <Monitor className="w-3.5 h-3.5" />
+              </button>
+            )}
+
             {/* Graceful Shutdown */}
             <button
               onClick={() => onActionClick(guest, 'shutdown')}

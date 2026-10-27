@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick } from 'lucide-react';
+import { Power, RotateCw, Square, RefreshCcw, Copy, Check, Clock, Network, Cpu, MemoryStick, Monitor } from 'lucide-react';
 import { ClusterResource, GuestAction } from '../types/pve';
 import { formatBytes, formatUptime } from '../utils/formatters';
 import { getOsInfo } from '../utils/osIcons';
@@ -8,12 +8,14 @@ interface GuestTableProps {
   guests: ClusterResource[];
   onActionClick: (guest: ClusterResource, action: GuestAction) => void;
   onOpenDetail: (guest: ClusterResource) => void;
+  onOpenConsole?: (guest: ClusterResource) => void;
 }
 
 export const GuestTable: React.FC<GuestTableProps> = ({
   guests,
   onActionClick,
-  onOpenDetail
+  onOpenDetail,
+  onOpenConsole
 }) => {
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
 
@@ -161,6 +163,15 @@ export const GuestTable: React.FC<GuestTableProps> = ({
                     <div className="inline-flex items-center gap-1.5">
                       {isRunning ? (
                         <>
+                          {onOpenConsole && (
+                            <button
+                              onClick={() => onOpenConsole(guest)}
+                              title="打开 VNC 控制台"
+                              className="p-1.5 rounded-lg bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-500/30"
+                            >
+                              <Monitor className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                           <button
                             onClick={() => onActionClick(guest, 'shutdown')}
                             title="优雅关机"

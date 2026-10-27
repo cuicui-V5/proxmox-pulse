@@ -8,12 +8,14 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3333',
-        changeOrigin: true
+        changeOrigin: true,
+        ws: true
       }
     }
   },
   build: {
+    target: 'esnext',
     outDir: 'dist',
-    chunkSizeWarningLimit: 1200
+    chunkSizeWarningLimit: 1500
   }
 });

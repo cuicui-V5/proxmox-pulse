@@ -89,3 +89,23 @@ export async function saveConfig(config: any) {
   });
   return res.json();
 }
+
+export async function requestVncProxy(
+  node: string,
+  type: string,
+  vmid: number
+): Promise<{
+  ok: boolean;
+  ticket?: string;
+  port?: string;
+  password?: string;
+  cert?: string;
+  user?: string;
+  upid?: string;
+  error?: string;
+}> {
+  const res = await fetch(`${BASE_URL}/guests/${node}/${type}/${vmid}/vncproxy`, {
+    method: 'POST'
+  });
+  return res.json();
+}
