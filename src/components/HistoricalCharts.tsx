@@ -18,6 +18,7 @@ export const HistoricalCharts: React.FC<HistoricalChartsProps> = ({
 }) => {
   const [timeframe, setTimeframe] = useState<'hour' | 'day' | 'week' | 'month' | 'year'>('hour');
   const [selectedTarget, setSelectedTarget] = useState<string>('node'); // 'node' or 'qemu/101'
+  const [nodeMetricType, setNodeMetricType] = useState<'load' | 'rootfs'>('load');
   const [data, setData] = useState<RrdDataPoint[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +70,13 @@ export const HistoricalCharts: React.FC<HistoricalChartsProps> = ({
   const cpuValues = data.map(pt => (pt.cpu ? pt.cpu * 100 : 0));
   const peakCpu = cpuValues.length > 0 ? Math.max(...cpuValues).toFixed(1) : '0';
   const latestCpu = cpuValues.length > 0 ? cpuValues[cpuValues.length - 1].toFixed(1) : '0';
+
+  const loadValues = data.map(pt => (pt.loadavg != null ? Number(pt.loadavg) : 0));
+  const peakLoad = loadValues.length > 0 ? Math.max(...loadValues).toFixed(2) : '0.00';
+  const latestLoad = loadValues.length > 0 ? loadValues[loadValues.length - 1].toFixed(2) : '0.00';
+
+  const latestRootUsed = data.length > 0 && data[data.length - 1].rootused != null ? data[data.length - 1].rootused! : 0;
+  const latestRootTotal = data.length > 0 && data[data.length - 1].roottotal != null ? data[data.length - 1].roottotal! : 0;
 
   // Dynamic Theme options based on isDark
   const baseChartTheme = useMemo(() => {
@@ -272,7 +280,111 @@ export const HistoricalCharts: React.FC<HistoricalChartsProps> = ({
     ]
   }), [baseChartTheme, data, isDark, timeLabels]);
 
-  // 4. Disk IO Chart Option
+  // 4.1 Node Load Average Chart Option (PVE official Node RRD metric)
+  const nodeLoadOption = useMemo(() => ({
+    ...baseChartTheme,
+    tooltip: {
+      ...baseChartTheme.tooltip,
+      formatter: (params: any) => {
+        if (!params || !params[0]) return '';
+        const idx = params[0].dataIndex;
+        let html = `<div class="font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'} pb-1">${timeLabels[idx]}</div>`;
+        params.forEach((item: any) => {
+          html += `<div class="flex items-center justify-between gap-4 py-0.5">
+            <span class="flex items-center gap-1.5">${item.marker} ${item.seriesName}</span>
+            <span class="font-mono font-semibold">${Number(item.value).toFixed(2)}</span>
+          </div>`;
+        });
+        return html;
+      }
+    },
+    yAxis: {
+      ...baseChartTheme.yAxis,
+      min: 0,
+      axisLabel: {
+        formatter: (val: number) => val.toFixed(1),
+        color: '#64748b'
+      }
+    },
+    series: [
+      {
+        name: '系统平均负载 (Load Average)',
+        type: 'line',
+        showSymbol: false,
+        smooth: true,
+        data: data.map(pt => (pt.loadavg != null ? Number(Number(pt.loadavg).toFixed(2)) : 0)),
+        lineStyle: { width: 2, color: '#f59e0b' },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 158, 11, 0.25)' },
+              { offset: 1, color: 'rgba(245, 158, 11, 0.0)' }
+            ]
+          }
+        }
+      }
+    ]
+  }), [baseChartTheme, data, isDark, timeLabels]);
+
+  // 4.2 Node Rootfs Storage Usage Chart Option
+  const nodeRootfsOption = useMemo(() => ({
+    ...baseChartTheme,
+    tooltip: {
+      ...baseChartTheme.tooltip,
+      formatter: (params: any) => {
+        if (!params || !params[0]) return '';
+        const idx = params[0].dataIndex;
+        let html = `<div class="font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'} pb-1">${timeLabels[idx]}</div>`;
+        params.forEach((item: any) => {
+          html += `<div class="flex items-center justify-between gap-4 py-0.5">
+            <span class="flex items-center gap-1.5">${item.marker} ${item.seriesName}</span>
+            <span class="font-mono font-semibold">${formatBytes(item.value)}</span>
+          </div>`;
+        });
+        return html;
+      }
+    },
+    yAxis: {
+      ...baseChartTheme.yAxis,
+      min: 0,
+      axisLabel: {
+        formatter: (val: number) => formatBytes(val, 0),
+        color: '#64748b'
+      }
+    },
+    series: [
+      {
+        name: '根存储已用 (Rootfs Used)',
+        type: 'line',
+        showSymbol: false,
+        smooth: true,
+        data: data.map(pt => pt.rootused || 0),
+        lineStyle: { width: 2, color: '#f97316' },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(249, 115, 22, 0.25)' },
+              { offset: 1, color: 'rgba(249, 115, 22, 0.0)' }
+            ]
+          }
+        }
+      },
+      {
+        name: '根存储总配额 (Rootfs Total)',
+        type: 'line',
+        showSymbol: false,
+        smooth: true,
+        data: data.map(pt => pt.roottotal || 0),
+        lineStyle: { width: 1, color: isDark ? '#64748b' : '#94a3b8', type: 'dashed' }
+      }
+    ]
+  }), [baseChartTheme, data, isDark, timeLabels]);
+
+  // 4.3 Guest VM Disk IO Chart Option (for QEMU / LXC)
   const diskChartOption = useMemo(() => ({
     ...baseChartTheme,
     tooltip: {
@@ -473,21 +585,79 @@ export const HistoricalCharts: React.FC<HistoricalChartsProps> = ({
             </div>
           </div>
 
-          {/* 4. Disk IO */}
+          {/* 4. Host Load / Rootfs OR Guest Disk IO */}
           <div className="bg-slate-50/70 dark:bg-slate-950/60 border border-slate-200/80 dark:border-slate-800/60 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <HardDrive className="w-4 h-4 text-amber-500 dark:text-amber-400" />
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">磁盘读写速率</span>
+            {selectedTarget === 'node' ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  {nodeMetricType === 'load' ? (
+                    <Activity className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                  ) : (
+                    <HardDrive className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                  )}
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    {nodeMetricType === 'load' ? '系统运行负载 (Server Load)' : '根存储空间变化 (Rootfs)'}
+                  </span>
+                  <div className="flex items-center bg-slate-200/80 dark:bg-slate-800 rounded-lg p-0.5 text-[10px] ml-1">
+                    <button
+                      type="button"
+                      onClick={() => setNodeMetricType('load')}
+                      className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
+                        nodeMetricType === 'load'
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      系统负载
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNodeMetricType('rootfs')}
+                      className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
+                        nodeMetricType === 'rootfs'
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      根盘存储
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
+                  {nodeMetricType === 'load' ? (
+                    <>
+                      <span>当前: <strong className="text-slate-900 dark:text-white">{latestLoad}</strong></span>
+                      <span>峰值: <strong className="text-amber-600 dark:text-amber-400">{peakLoad}</strong></span>
+                    </>
+                  ) : (
+                    <>
+                      <span>已用: <strong className="text-amber-600 dark:text-amber-400">{formatBytes(latestRootUsed)}</strong></span>
+                      <span>总配额: <strong className="text-slate-900 dark:text-white">{formatBytes(latestRootTotal)}</strong></span>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-[11px] font-mono">
-                <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">读取 (Read)</span>
-                <span className="flex items-center gap-1 text-pink-600 dark:text-pink-400">写入 (Write)</span>
+            ) : (
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <HardDrive className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">磁盘读写速率</span>
+                </div>
+                <div className="flex items-center gap-3 text-[11px] font-mono">
+                  <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">读取 (Read)</span>
+                  <span className="flex items-center gap-1 text-pink-600 dark:text-pink-400">写入 (Write)</span>
+                </div>
               </div>
-            </div>
+            )}
             <div className="h-56">
               <ReactECharts
-                option={diskChartOption}
+                option={
+                  selectedTarget === 'node'
+                    ? nodeMetricType === 'load'
+                      ? nodeLoadOption
+                      : nodeRootfsOption
+                    : diskChartOption
+                }
                 style={{ height: '100%', width: '100%' }}
                 opts={{ renderer: 'canvas' }}
               />

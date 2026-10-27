@@ -40,12 +40,14 @@ export const VncConsoleModal: React.FC<VncConsoleModalProps> = ({
   const [showClipboard, setShowClipboard] = useState<boolean>(false);
   const [clipboardText, setClipboardText] = useState<string>('');
   const [clipboardSent, setClipboardSent] = useState<boolean>(false);
+  const [isTyping, setIsTyping] = useState<boolean>(false);
   const [reconnectKey, setReconnectKey] = useState<number>(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
   const scaleViewportRef = useRef<boolean>(scaleViewport);
+  const typingTimerRef = useRef<any>(null);
 
   const osInfo = getOsInfo(guest.name);
 
@@ -207,8 +209,73 @@ export const VncConsoleModal: React.FC<VncConsoleModalProps> = ({
     setShowKeysMenu(false);
   };
 
-  const handleSendClipboard = (e: React.FormEvent) => {
-    e.preventDefault();
+  // 1. Simulate Typing directly into the active screen (works 100% in all consoles/shells/terminals)
+  const handleTypeToScreen = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!rfbRef.current || status !== 'connected' || !clipboardText) return;
+    const rfb = rfbRef.current;
+
+    // Also sync the clipboard buffer if possible
+    try {
+      rfb.clipboardPasteFrom(clipboardText);
+    } catch {}
+
+    // Focus canvas
+    try {
+      rfb.focus();
+    } catch {}
+
+    if (typingTimerRef.current) {
+      clearTimeout(typingTimerRef.current);
+    }
+
+    setIsTyping(true);
+
+    const cleanText = clipboardText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    let idx = 0;
+
+    const typeNext = () => {
+      if (idx >= cleanText.length) {
+        setIsTyping(false);
+        setClipboardSent(true);
+        setTimeout(() => {
+          setClipboardSent(false);
+          setShowClipboard(false);
+          setClipboardText('');
+        }, 1200);
+        return;
+      }
+
+      const ch = cleanText[idx];
+      idx++;
+
+      let keysym = ch.charCodeAt(0);
+      if (ch === '\n') {
+        keysym = 0xff0d; // XK_Return
+      } else if (ch === '\t') {
+        keysym = 0xff09; // XK_Tab
+      } else if (ch === '\b') {
+        keysym = 0xff08; // XK_BackSpace
+      } else if (keysym > 255) {
+        // Standard X11 Unicode Keysym
+        keysym = 0x01000000 | ch.codePointAt(0)!;
+      }
+
+      try {
+        rfb.sendKey(keysym);
+      } catch (err) {
+        console.error('Error typing character:', err);
+      }
+
+      typingTimerRef.current = setTimeout(typeNext, 12);
+    };
+
+    typeNext();
+  };
+
+  // 2. Sync to Guest OS Clipboard buffer (for VMs with desktop clipboard services)
+  const handleSyncClipboardOnly = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (rfbRef.current && clipboardText) {
       rfbRef.current.clipboardPasteFrom(clipboardText);
       setClipboardSent(true);
@@ -410,25 +477,44 @@ export const VncConsoleModal: React.FC<VncConsoleModalProps> = ({
 
         {/* Clipboard drawer / popup */}
         {showClipboard && (
-          <div className="p-3 bg-slate-800 border-b border-slate-700 flex items-center gap-2 text-xs">
-            <span className="text-slate-400 shrink-0">发送文本:</span>
+          <div className="p-3 bg-slate-800 border-b border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 text-xs">
+            <span className="text-slate-400 shrink-0 flex items-center gap-1">
+              <Keyboard className="w-3.5 h-3.5 text-orange-400" />
+              <span>发送文本:</span>
+            </span>
             <input
               type="text"
               value={clipboardText}
               onChange={(e) => setClipboardText(e.target.value)}
-              placeholder="在此输入文本并发送至虚拟机剪贴板..."
-              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-orange-500 font-mono"
+              placeholder="在此输入命令、密码或文本（按回车直接键入虚拟机）..."
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-slate-200 placeholder-slate-500 text-xs focus:outline-none focus:border-orange-500 font-mono"
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSendClipboard(e);
+                if (e.key === 'Enter') handleTypeToScreen(e);
               }}
+              autoFocus
             />
-            <button
-              onClick={handleSendClipboard}
-              className="px-3 py-1 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium inline-flex items-center gap-1 transition-colors"
-            >
-              {clipboardSent ? <Check className="w-3 h-3 text-emerald-300" /> : <ClipboardPaste className="w-3 h-3" />}
-              <span>{clipboardSent ? '已发送' : '发送'}</span>
-            </button>
+            <div className="flex items-center gap-1.5 shrink-0 justify-end">
+              <button
+                type="button"
+                onClick={() => handleTypeToScreen()}
+                disabled={isTyping || !clipboardText.trim()}
+                title="模拟键盘按键直接将文本敲入虚拟机屏幕（适用于所有终端、Shell 及登录界面）"
+                className="px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-500 disabled:opacity-50 text-white font-medium inline-flex items-center gap-1.5 transition-colors shadow-sm"
+              >
+                {isTyping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Keyboard className="w-3.5 h-3.5" />}
+                <span>{isTyping ? '正在键入...' : '键入屏幕 (推荐)'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSyncClipboardOnly()}
+                disabled={!clipboardText.trim()}
+                title="写入虚拟机系统剪切板（需虚拟机内运行有桌面环境及剪贴板同步服务，支持进入虚拟机后按 Ctrl+V 粘贴）"
+                className="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 font-medium inline-flex items-center gap-1 transition-colors"
+              >
+                {clipboardSent ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <ClipboardPaste className="w-3.5 h-3.5" />}
+                <span>{clipboardSent ? '已同步' : '同步剪贴板'}</span>
+              </button>
+            </div>
           </div>
         )}
 
