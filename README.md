@@ -112,11 +112,24 @@ docker run -d --name proxmox-pulse --restart unless-stopped -p 3333:3333 pve-pul
 
 ---
 
-## 🌡️ 关于 CPU 温度监控的说明
+## 🌡️ 关于 CPU 温度监控的说明（两种方案）
 
-Proxmox VE 官方 API 原生未开放温度接口。Proxmox Pulse 提供了最优雅无侵入的解决方案：
-- **无须破坏 PVE 源码**：只需在面板设置或 `.env` 中提供 PVE 的 SSH 凭据，面板后端会自动通过轻量通道读取硬件 `sensors` / `coretemp` 传感器数据。
-- **兼容性**：自动适配 Intel Core / Celeron / Xeon、AMD Ryzen / EPYC 以及 ACPI 虚拟温控区域。
+Proxmox VE 官方 API 默认未返回硬件温度。Proxmox Pulse 提供了业界最优雅的免密直连方案与备用通道：
+
+### ✨ 方案一：PVE 原生 API 扩展（强烈推荐 • 最优雅）
+在 PVE 网页 Shell 或 SSH 终端中粘贴执行：
+```bash
+curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve-thermal.sh | bash
+```
+- **工作原理**：向 PVE 官方节点接口注入安全只读读取逻辑，使官方 `/api2/json/nodes/{node}/status` 自动包含温度数据。
+- **极致优雅**：
+  - 🔒 **纯 API Token 通信**：面板**完全不需要**任何 SSH 账号密码！
+  - 🌐 **无需开放 22 端口**：仅复用现有 8006 端口即可完成所有监控。
+  - ⚡ **零额外网络延迟**：温度数据伴随每次节点常规状态查询一次性返回。
+  - 🔄 **支持随时一键完全还原**：执行 `bash setup-pve-thermal.sh uninstall` 即可恢复官方原版文件。
+
+### 方案二：SSH 探针（免改动 PVE 备用方案）
+如果无法或不希望在 PVE 上执行扩展脚本，可在面板「设置」或 `.env` 中提供 PVE 的 SSH 密码/私钥，面板将通过后台探针轻量采样。
 
 ---
 

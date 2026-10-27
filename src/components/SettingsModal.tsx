@@ -195,69 +195,59 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
             </div>
 
-            {/* Section 2: SSH Thermal Sensor */}
+            {/* Section 2: Temperature Sensor */}
             <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
               <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                 <Thermometer className="w-4 h-4 text-orange-500" />
-                <span>CPU 温度传感器探针配置 (可选)</span>
+                <span>CPU 核心温度监控方案</span>
               </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
-                填写 PVE 宿主机 SSH 登录凭据后，面板将自动安全采集 CPU 温度（支持 Intel/AMD/ACPI 传感器）
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3 leading-relaxed">
+                面板支持通过原生 PVE REST API 或 SSH 探针获取 CPU 与各核心温度：
               </p>
 
-              <div className="grid grid-cols-3 gap-3 mb-3">
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    SSH 主机 IP
-                  </label>
-                  <input
-                    type="text"
-                    value={sshHost}
-                    onChange={(e) => setSshHost(e.target.value)}
-                    placeholder={host || "192.168.2.5"}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:border-orange-500 text-xs"
-                  />
+              {/* Recommended: Native API Hook */}
+              <div className="p-3 mb-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 text-xs">
+                <div className="font-bold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5 mb-1">
+                  <span>✨ 方案一（推荐 • 优雅免密）：PVE 原生 API 扩展</span>
                 </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    SSH 端口
-                  </label>
-                  <input
-                    type="number"
-                    value={sshPort}
-                    onChange={(e) => setSshPort(Number(e.target.value))}
-                    placeholder="22"
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:border-orange-500 font-mono text-xs"
-                  />
-                </div>
+                <p className="text-[11px] text-slate-600 dark:text-emerald-200/80 mb-2 leading-relaxed">
+                  在 PVE 网页 Shell 中粘贴执行下方单行命令。面板将直接通过官方 API Token 在标准 8006 端口获取温度，<strong>无需开放 SSH 端口、无需密码、零网络开销</strong>：
+                </p>
+                <code className="block bg-white dark:bg-slate-950 px-2 py-1.5 rounded border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-300 font-mono text-[11px] select-all break-all">
+                  curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve-thermal.sh | bash
+                </code>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-2">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    SSH 用户名
-                  </label>
-                  <input
-                    type="text"
-                    value={sshUser}
-                    onChange={(e) => setSshUser(e.target.value)}
-                    placeholder="root"
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:border-orange-500 text-xs font-mono"
-                  />
+              {/* Alternative: SSH Probe */}
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
+                <div className="font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  方案二（备用）：SSH 探针采集
                 </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                  若无法在 PVE 上执行扩展脚本，可在此处填写 SSH 凭据作为备选采集通道：
+                </p>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    SSH 密码
-                  </label>
-                  <input
-                    type="password"
-                    value={sshPassword}
-                    onChange={(e) => setSshPassword(e.target.value)}
-                    placeholder="若无需修改请留空"
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-slate-900 dark:text-slate-200 focus:outline-none focus:border-orange-500 text-xs font-mono"
-                  />
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-0.5">SSH 用户名</label>
+                    <input
+                      type="text"
+                      value={sshUser}
+                      onChange={(e) => setSshUser(e.target.value)}
+                      placeholder="root"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 font-mono text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-500 mb-0.5">SSH 密码</label>
+                    <input
+                      type="password"
+                      value={sshPassword}
+                      onChange={(e) => setSshPassword(e.target.value)}
+                      placeholder="留空即使用方案一"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 text-slate-800 dark:text-slate-200 font-mono text-xs"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

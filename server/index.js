@@ -46,11 +46,12 @@ app.get('/api/overview', async (req, res) => {
 
     // Primary node status (e.g. 'pve' or first available node)
     const primaryNodeName = nodes[0]?.node || 'pve';
-    const [nodeStatus, storages, thermal] = await Promise.all([
+    const [nodeStatus, storages] = await Promise.all([
       pveClient.getNodeStatus(primaryNodeName).catch(() => null),
-      pveClient.getStorage(primaryNodeName).catch(() => []),
-      thermalService.getTemperature(null, pveClient.getSshConfig()).catch(() => ({ available: false }))
+      pveClient.getStorage(primaryNodeName).catch(() => [])
     ]);
+
+    const thermal = await thermalService.getTemperature(nodeStatus, pveClient.getSshConfig()).catch(() => ({ available: false }));
 
     // Breakdown resources
     const guests = resources.filter(r => r.type === 'qemu' || r.type === 'lxc');
