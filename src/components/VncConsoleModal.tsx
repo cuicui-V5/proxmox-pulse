@@ -40,90 +40,134 @@ export const VncConsoleModal: React.FC<VncConsoleModalProps> = ({
   const [showClipboard, setShowClipboard] = useState<boolean>(false);
   const [clipboardText, setClipboardText] = useState<string>('');
   const [clipboardSent, setClipboardSent] = useState<boolean>(false);
+  const [reconnectKey, setReconnectKey] = useState<number>(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
+  const scaleViewportRef = useRef<boolean>(scaleViewport);
 
   const osInfo = getOsInfo(guest.name);
 
-  const connect = useCallback(async () => {
-    if (!guest || !containerRef.current) return;
-
-    // Clean up existing instance
-    if (rfbRef.current) {
-      try {
-        rfbRef.current.disconnect();
-      } catch {}
-      rfbRef.current = null;
-    }
-
-    // Clear container
-    containerRef.current.innerHTML = '';
-    setStatus('connecting');
-    setErrorMessage(null);
-
-    try {
-      const ticketRes = await requestVncProxy(guest.node, guest.type, guest.vmid);
-      if (!ticketRes.ok || !ticketRes.ticket || !ticketRes.port) {
-        throw new Error(ticketRes.error || '获取 VNC 票据失败，请确认虚拟机处于运行状态');
-      }
-
-      const { ticket, port, password } = ticketRes;
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/api/vnc-ws?node=${guest.node}&type=${guest.type}&vmid=${guest.vmid}&port=${port}&ticket=${encodeURIComponent(ticket)}`;
-
-      const rfb = new RFB(containerRef.current, wsUrl, {
-        credentials: { password }
-      });
-
-      rfb.scaleViewport = scaleViewport;
-      rfb.resizeSession = false;
-      rfb.focusOnClick = true;
-
-      rfb.addEventListener('connect', () => {
-        setStatus('connected');
-        setErrorMessage(null);
-      });
-
-      rfb.addEventListener('disconnect', (e: any) => {
-        setStatus('disconnected');
-        if (e.detail && e.detail.clean === false) {
-          setErrorMessage('VNC 会话已意外终止');
-        }
-      });
-
-      rfb.addEventListener('securityfailure', (e: any) => {
-        setStatus('error');
-        setErrorMessage(e.detail?.reason || 'VNC 安全握手认证失败');
-      });
-
-      rfbRef.current = rfb;
-    } catch (err: any) {
-      setStatus('error');
-      setErrorMessage(err.message || '连接控制台失败');
-    }
-  }, [guest, scaleViewport]);
+  // Synchronize scaleViewportRef
+  scaleViewportRef.current = scaleViewport;
 
   useEffect(() => {
-    connect();
-    return () => {
+    let isCancelled = false;
+    let localRfb: RFB | null = null;
+
+    async function initVnc() {
+      if (!guest || !containerRef.current) return;
+
+      // Clean up previous instance
       if (rfbRef.current) {
         try {
           rfbRef.current.disconnect();
         } catch {}
         rfbRef.current = null;
       }
-    };
-  }, [connect]);
 
-  // Handle Scale Toggle
+      // Purge any existing DOM children
+      containerRef.current.innerHTML = '';
+      setStatus('connecting');
+      setErrorMessage(null);
+
+      try {
+        const ticketRes = await requestVncProxy(guest.node, guest.type, guest.vmid);
+
+        // If component unmounted or effect re-ran while waiting for ticket, abort immediately!
+        if (isCancelled || !containerRef.current) return;
+
+        if (!ticketRes.ok || !ticketRes.ticket || !ticketRes.port) {
+          throw new Error(ticketRes.error || '获取 VNC 票据失败，请确认虚拟机处于运行状态');
+        }
+
+        // Clean container again right before appending canvas to guarantee single viewport
+        containerRef.current.innerHTML = '';
+
+        const { ticket, port, password } = ticketRes;
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/api/vnc-ws?node=${guest.node}&type=${guest.type}&vmid=${guest.vmid}&port=${port}&ticket=${encodeURIComponent(ticket)}`;
+
+        localRfb = new RFB(containerRef.current, wsUrl, {
+          credentials: { password }
+        });
+
+        if (isCancelled) {
+          localRfb.disconnect();
+          return;
+        }
+
+        localRfb.scaleViewport = scaleViewportRef.current;
+        localRfb.resizeSession = false;
+        localRfb.focusOnClick = true;
+
+        localRfb.addEventListener('connect', () => {
+          if (!isCancelled) {
+            setStatus('connected');
+            setErrorMessage(null);
+          }
+        });
+
+        localRfb.addEventListener('disconnect', (e: any) => {
+          if (!isCancelled) {
+            setStatus('disconnected');
+            if (e.detail && e.detail.clean === false) {
+              setErrorMessage('VNC 会话已意外终止');
+            }
+          }
+        });
+
+        localRfb.addEventListener('securityfailure', (e: any) => {
+          if (!isCancelled) {
+            setStatus('error');
+            setErrorMessage(e.detail?.reason || 'VNC 安全握手认证失败');
+          }
+        });
+
+        rfbRef.current = localRfb;
+      } catch (err: any) {
+        if (!isCancelled) {
+          setStatus('error');
+          setErrorMessage(err.message || '连接控制台失败');
+        }
+      }
+    }
+
+    initVnc();
+
+    return () => {
+      isCancelled = true;
+      if (localRfb) {
+        try {
+          localRfb.disconnect();
+        } catch {}
+      }
+      if (rfbRef.current) {
+        try {
+          rfbRef.current.disconnect();
+        } catch {}
+        rfbRef.current = null;
+      }
+      if (containerRef.current) {
+        containerRef.current.innerHTML = '';
+      }
+    };
+  }, [guest?.node, guest?.type, guest?.vmid, reconnectKey]);
+
+  // Handle Scale Toggle without re-running connection!
   const toggleScaling = () => {
     const next = !scaleViewport;
     setScaleViewport(next);
+    scaleViewportRef.current = next;
     if (rfbRef.current) {
       rfbRef.current.scaleViewport = next;
     }
+  };
+
+  // Reconnect trigger
+  const handleReconnect = () => {
+    setReconnectKey((prev) => prev + 1);
   };
 
   // Fullscreen toggle
@@ -334,7 +378,7 @@ export const VncConsoleModal: React.FC<VncConsoleModalProps> = ({
 
             {/* Reconnect */}
             <button
-              onClick={connect}
+              onClick={handleReconnect}
               title="重新连接控制台"
               className="p-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
             >
@@ -422,7 +466,7 @@ export const VncConsoleModal: React.FC<VncConsoleModalProps> = ({
               </p>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={connect}
+                  onClick={handleReconnect}
                   className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold inline-flex items-center gap-2 transition-all shadow-md"
                 >
                   <RotateCw className="w-3.5 h-3.5" />
