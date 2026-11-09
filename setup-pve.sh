@@ -343,7 +343,7 @@ echo "  -e PVE_PORT=8006 \\"
 echo "  -e PVE_TOKEN_ID=${TOKEN_ID} \\"
 echo "  -e PVE_TOKEN_SECRET=${SECRET_DISPLAY} \\"
 echo "  -e PVE_VERIFY_SSL=false \\"
-echo "  cuicui-v5/proxmox-pulse:latest"
+echo "  cuicuiv5google/proxmox-pulse:latest"
 echo -e "------------------------------------------------------------------------"
 echo ""
 

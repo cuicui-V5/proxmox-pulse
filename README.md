@@ -130,7 +130,7 @@ docker run -d \
   -e PVE_TOKEN_ID=root@pam!dashboard \
   -e PVE_TOKEN_SECRET=你的TokenSecretUUID \
   -e PVE_VERIFY_SSL=false \
-  cuicui-v5/proxmox-pulse:latest
+  cuicuiv5google/proxmox-pulse:latest
 ```
 
 启动完成后，在浏览器中打开 `http://<机器IP>:3333` 即可立即使用！
@@ -171,7 +171,7 @@ docker run -d \
 
 如果不愿提前修改配置文件，可以直接启动空白容器：
 ```bash
-docker run -d --name proxmox-pulse --restart unless-stopped -p 3333:3333 cuicui-v5/proxmox-pulse:latest
+docker run -d --name proxmox-pulse --restart unless-stopped -p 3333:3333 cuicuiv5google/proxmox-pulse:latest
 ```
 直接在浏览器访问 `http://<IP>:3333`，面板将自动弹出**配置连接向导**，在界面上填入 PVE 地址与 Token 密钥，点击「保存」即可直连。
 
