@@ -286,9 +286,31 @@ if [ "$THERMAL_ONLY" != "yes" ]; then
 
     if [ "$TOKEN_EXISTS" = true ] && [ "$RECREATE_TOKEN" != "yes" ]; then
         echo -e "  ${YELLOW}ℹ️ 检测到已存在 API Token:${NC} ${BOLD}root@pam!dashboard${NC}"
-        echo -e "  如果您知晓先前的 Token Secret (UUID 密钥)，可直接在面板中使用。"
-        echo -e "  如需重新生成 Secret 密钥，可使用参数重新运行: ${CYAN}bash setup-pve.sh --recreate-token${NC}"
-    else
+        echo -e "  ${CYAN}💡 为什么没有直接显示密钥？${NC}"
+        echo -e "     PVE 官方出于安全规范采用单向不可逆哈希存储凭据，明文 Secret 仅在首次生成时输出一次，系统无法逆向解密还原。"
+        echo -e "     如果您知晓先前的 Token Secret (UUID 密钥)，可直接在面板中使用；为防止冲掉现有连接，脚本默认保留该 Token。"
+
+        # 尝试通过终端 /dev/tty 询问用户是否就地重置
+        REGEN_NOW=false
+        if [ -r /dev/tty ]; then
+            echo ""
+            echo -ne "  ${YELLOW}❓ 是否立即重置并生成新的 Token 密钥（可在下方直接获取完整运行命令）？[y/N]: ${NC}"
+            read -r choice < /dev/tty || choice="n"
+            case "$choice" in
+                y|Y|yes|YES) REGEN_NOW=true ;;
+                *) REGEN_NOW=false ;;
+            esac
+        fi
+
+        if [ "$REGEN_NOW" = true ]; then
+            RECREATE_TOKEN="yes"
+        else
+            echo -e "  如需随时重新生成 Secret 密钥，也可带参数重新运行："
+            echo -e "  ${CYAN}curl -sSL https://raw.githubusercontent.com/cuicui-V5/proxmox-pulse/main/setup-pve.sh | bash -s -- --recreate-token${NC}"
+        fi
+    fi
+
+    if [ "$TOKEN_EXISTS" != true ] || [ "$RECREATE_TOKEN" = "yes" ]; then
         if [ "$TOKEN_EXISTS" = true ]; then
             echo -e "  🔄 正在删除旧的 Token..."
             pveum user token remove root@pam dashboard 2>/dev/null || true
